@@ -1,10 +1,16 @@
+@font-face {
+  font-family: "ChosunGs";
+  src: url("fonts/ChosunGs.woff2") format("woff2");
+  font-display: swap;
+}
+
 :root {
   --ink: #f4ead8;
   --ink-dim: rgba(244, 234, 216, 0.62);
   --gold: #e8b85c;
   --panel: rgba(18, 14, 20, 0.86);
   --line: rgba(244, 234, 216, 0.14);
-  --serif: "Gowun Batang", serif;
+  --serif: "ChosunGs", serif;
   --sans: "Noto Sans KR", system-ui, sans-serif;
 }
 
@@ -48,7 +54,7 @@ html, body {
   font-family: var(--serif);
   line-height: 1;
 }
-.count b { font-size: 44px; font-weight: 700; }
+.count b { font-size: 44px; font-weight: normal; }
 .count span { font-size: 18px; color: var(--ink-dim); margin-left: 2px; }
 
 .meta {
@@ -153,7 +159,7 @@ button.primary:hover { background: #f2c873; }
 h1, h2 {
   margin: 0;
   font-family: var(--serif);
-  font-weight: 700;
+  font-weight: normal;
 }
 h1 { font-size: 38px; }
 h2 { font-size: 26px; }
@@ -207,6 +213,5 @@ h2 { font-size: 26px; }
   margin: 4px 0 0;
   font-family: var(--serif);
   font-size: 18px;
-  font-weight: 700;
   font-variant-numeric: tabular-nums;
 }

@@ -718,7 +718,7 @@ function drawFloats() {
   for (const f of S.floats) {
     ctx.globalAlpha = Math.min(1, f.life / 30);
     ctx.fillStyle = f.color;
-    ctx.font = `700 ${f.size}px "Gowun Batang", serif`;
+    ctx.font = `${f.size}px "ChosunGs", serif`;
     ctx.fillText(f.text, f.x, f.y);
   }
   ctx.globalAlpha = 1;
@@ -819,9 +819,9 @@ function makeCard() {
   g.font = '700 30px "Noto Sans KR", sans-serif';
   g.fillText('수행 완료', 540, 150);
   g.fillStyle = '#f4ead8';
-  g.font = '700 76px "Gowun Batang", serif';
+  g.font = '80px "ChosunGs", serif';
   g.fillText('108번뇌 꿰기', 540, 240);
-  g.font = '700 88px "Gowun Batang", serif';
+  g.font = '92px "ChosunGs", serif';
   g.fillText(formatTime(S.elapsed), 540, 640);
   g.fillStyle = 'rgba(244,234,216,0.7)';
   g.font = '400 34px "Noto Sans KR", sans-serif';
