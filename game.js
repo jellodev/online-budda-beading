@@ -115,6 +115,10 @@ const sfx = {
   },
 };
 
+function track(name, params) {
+  if (typeof window.gtag === 'function') window.gtag('event', name, params);
+}
+
 function vibrate(ms) {
   if (navigator.vibrate) navigator.vibrate(ms);
 }
@@ -495,6 +499,7 @@ function threadBead() {
   if (n > S.peak) {
     S.peak = n;
     if (MILESTONES[n]) {
+      track('milestone', { beads: n });
       sayQuote(MILESTONES[n], 4200);
       sfx.moktak(CHAPTERS.some((c) => c.at === n) ? 3 : 1);
     }
@@ -548,6 +553,7 @@ function finish() {
   S.finishT = 0;
   S.ringFrom = S.strung.map((b) => sampleAt(b.s));
   forget(SAVE_KEY);
+  track('game_complete', { seconds: Math.round(S.elapsed), drops: S.drops });
   const best = load(BEST_KEY);
   if (!best || S.elapsed < best.time) store(BEST_KEY, { time: S.elapsed, drops: S.drops });
   sfx.moktak(3);
@@ -778,6 +784,7 @@ function shareText() {
 
 async function share() {
   const text = shareText();
+  track('share', { phase: S.phase, beads: S.strung.length });
   const url = pageUrl();
   if (navigator.share) {
     try {
@@ -833,6 +840,7 @@ function makeCard() {
 }
 
 async function saveCard() {
+  track('card_save');
   await document.fonts.ready;
   const blob = await new Promise((resolve) => makeCard().toBlob(resolve, 'image/png'));
   if (!blob) return;
@@ -867,6 +875,7 @@ function begin(saved) {
   $('result').hidden = true;
   audioCtx();
   sfx.moktak(1);
+  track('game_start', { mode: saved ? 'continue' : 'new', beads: S.strung.length });
   sayQuote(saved ? '다시 오셨군요. 번뇌는 그대로 기다리고 있었습니다.' : '바늘 끝이 가는 곳으로, 마음도 갑니다.', 3600);
 }
 
@@ -895,6 +904,7 @@ $('btn-sound').addEventListener('click', () => {
   syncSoundButton();
 });
 $('btn-share').addEventListener('click', share);
+document.querySelector('.promo').addEventListener('click', () => track('promo_click'));
 $('btn-share-result').addEventListener('click', share);
 $('btn-card').addEventListener('click', saveCard);
 $('btn-again').addEventListener('click', () => begin(null));
