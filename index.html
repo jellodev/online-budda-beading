@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<title>108번뇌 꿰기</title>
+<meta name="description" content="염주 108알. 할 수 있다. 아마도. 바늘 하나로 108번뇌를 꿰는 가장 억울한 수행 게임.">
+<meta name="theme-color" content="#141a2e">
+<meta property="og:type" content="website">
+<meta property="og:title" content="108번뇌 꿰기">
+<meta property="og:description" content="염주 108알. 할 수 있다. 아마도.">
+<meta property="og:image" content="og.png">
+<meta property="og:locale" content="ko_KR">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22%3E%3Ctext y=%22.9em%22 font-size=%2290%22%3E%F0%9F%93%BF%3C/text%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@400;700&family=Noto+Sans+KR:wght@400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<canvas id="game"></canvas>
+
+<header class="hud">
+  <div class="count"><b id="count">0</b><span>/108</span></div>
+  <div class="meta">
+    <div id="time">00:00</div>
+    <div>떨군 알 <b id="drops">0</b></div>
+  </div>
+</header>
+
+<p id="quote" class="quote"></p>
+<p id="toast" class="toast"></p>
+
+<nav class="tools">
+  <button id="btn-sound" type="button" aria-label="소리">소리 켬</button>
+  <button id="btn-share" type="button">자랑하기</button>
+  <button id="btn-restart" type="button">처음부터</button>
+</nav>
+
+<section id="intro" class="overlay">
+  <div class="panel">
+    <p class="eyebrow">수행 게임</p>
+    <h1>108번뇌 꿰기</h1>
+    <p class="tagline">염주 108알. 할 수 있다. 아마도.</p>
+    <ul class="howto">
+      <li>바늘은 <b>움직이는 방향</b>을 가리킵니다.</li>
+      <li>알의 <b>구멍 방향</b>대로 바늘을 통과시키면 꿰어집니다.</li>
+      <li>바늘 끝이 <b>아래를 향하면</b> 꿴 알이 흘러내립니다.</li>
+      <li>저장은 자동, 체크포인트는 없습니다.</li>
+    </ul>
+    <div class="actions">
+      <button id="btn-continue" class="primary" type="button" hidden>이어하기</button>
+      <button id="btn-start" class="primary" type="button">수행 시작</button>
+    </div>
+    <p class="fine">특정 부류의 사람을 위해 만들었습니다. 그들을 괴롭히기 위해서.<br>— Getting Over It에 바치는 오마주</p>
+  </div>
+</section>
+
+<section id="result" class="overlay" hidden>
+  <div class="panel">
+    <p class="eyebrow">성불(?) 완료</p>
+    <h2>108번뇌를 꿰었습니다</h2>
+    <dl class="stats">
+      <div><dt>걸린 시간</dt><dd id="r-time">-</dd></div>
+      <div><dt>떨군 알</dt><dd id="r-drops">-</dd></div>
+      <div><dt>최고 기록</dt><dd id="r-best">-</dd></div>
+    </dl>
+    <div class="actions">
+      <button id="btn-share-result" class="primary" type="button">자랑하기</button>
+      <button id="btn-card" type="button">인증 카드 저장</button>
+      <button id="btn-again" type="button">다시 수행</button>
+    </div>
+  </div>
+</section>
+
+<script src="game.js"></script>
+</body>
+</html>

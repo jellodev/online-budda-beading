@@ -1,0 +1,212 @@
+:root {
+  --ink: #f4ead8;
+  --ink-dim: rgba(244, 234, 216, 0.62);
+  --gold: #e8b85c;
+  --panel: rgba(18, 14, 20, 0.86);
+  --line: rgba(244, 234, 216, 0.14);
+  --serif: "Gowun Batang", serif;
+  --sans: "Noto Sans KR", system-ui, sans-serif;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  background: #141a2e;
+  color: var(--ink);
+  font-family: var(--sans);
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  overscroll-behavior: none;
+  word-break: keep-all;
+}
+
+#game {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  touch-action: none;
+  cursor: none;
+}
+
+.hud {
+  position: fixed;
+  top: max(14px, env(safe-area-inset-top));
+  left: 16px;
+  right: 16px;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  pointer-events: none;
+}
+
+.count {
+  font-family: var(--serif);
+  line-height: 1;
+}
+.count b { font-size: 44px; font-weight: 700; }
+.count span { font-size: 18px; color: var(--ink-dim); margin-left: 2px; }
+
+.meta {
+  text-align: right;
+  font-size: 13px;
+  color: var(--ink-dim);
+  line-height: 1.6;
+  font-variant-numeric: tabular-nums;
+}
+.meta #time { font-size: 18px; color: var(--ink); }
+.meta b { color: #ff8a7a; font-weight: 700; }
+
+.quote, .toast {
+  position: fixed;
+  left: 16px;
+  right: 16px;
+  margin: 0 auto;
+  max-width: 420px;
+  text-align: center;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.6s ease;
+}
+.quote {
+  bottom: calc(max(16px, env(safe-area-inset-bottom)) + 56px);
+  font-family: var(--serif);
+  font-size: 17px;
+  line-height: 1.55;
+  text-shadow: 0 1px 12px rgba(0, 0, 0, 0.7);
+}
+.toast {
+  top: 50%;
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: var(--panel);
+  font-size: 14px;
+}
+.quote.on, .toast.on { opacity: 1; }
+
+.tools {
+  position: fixed;
+  bottom: max(14px, env(safe-area-inset-bottom));
+  left: 16px;
+  right: 16px;
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+}
+
+button {
+  font: inherit;
+  font-size: 13px;
+  color: var(--ink);
+  background: rgba(0, 0, 0, 0.28);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 8px 14px;
+  cursor: pointer;
+  transition: background 0.2s ease, transform 0.1s ease;
+}
+button:hover { background: rgba(255, 255, 255, 0.08); }
+button:active { transform: scale(0.97); }
+button.primary {
+  background: var(--gold);
+  color: #24160a;
+  border-color: transparent;
+  font-weight: 700;
+  font-size: 16px;
+  padding: 12px 22px;
+}
+button.primary:hover { background: #f2c873; }
+
+.overlay {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: rgba(8, 6, 12, 0.55);
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
+  cursor: default;
+}
+.overlay[hidden] { display: none; }
+
+.panel {
+  width: 100%;
+  max-width: 380px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  padding: 28px 24px 22px;
+  text-align: center;
+}
+
+.eyebrow {
+  margin: 0 0 6px;
+  font-size: 12px;
+  letter-spacing: 0.2em;
+  color: var(--gold);
+}
+h1, h2 {
+  margin: 0;
+  font-family: var(--serif);
+  font-weight: 700;
+}
+h1 { font-size: 38px; }
+h2 { font-size: 26px; }
+.tagline {
+  margin: 8px 0 18px;
+  font-family: var(--serif);
+  color: var(--ink-dim);
+}
+
+.howto {
+  list-style: none;
+  margin: 0 0 22px;
+  padding: 14px 16px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.04);
+  text-align: left;
+  font-size: 14px;
+  line-height: 1.8;
+  color: var(--ink-dim);
+}
+.howto b { color: var(--ink); }
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+}
+.actions [hidden] { display: none; }
+
+.fine {
+  margin: 18px 0 0;
+  font-size: 11px;
+  line-height: 1.6;
+  color: rgba(244, 234, 216, 0.4);
+}
+
+.stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin: 20px 0 22px;
+}
+.stats div {
+  padding: 10px 4px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.05);
+}
+.stats dt { font-size: 11px; color: var(--ink-dim); }
+.stats dd {
+  margin: 4px 0 0;
+  font-family: var(--serif);
+  font-size: 18px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
