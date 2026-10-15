@@ -206,8 +206,8 @@ canvas.addEventListener('pointerdown', (e) => {
   }
 });
 
-canvas.addEventListener('pointermove', (e) => {
-  if (S.phase !== 'play') return;
+window.addEventListener('pointermove', (e) => {
+  if (S.phase !== 'play' || e.target.closest('button, a')) return;
   if (e.pointerType === 'touch') {
     if (!input.down) return;
     const gain = 1.25 / view.scale;
@@ -221,7 +221,7 @@ canvas.addEventListener('pointermove', (e) => {
 });
 
 for (const type of ['pointerup', 'pointercancel']) {
-  canvas.addEventListener(type, () => { input.down = false; });
+  window.addEventListener(type, () => { input.down = false; });
 }
 
 function update() {
@@ -425,7 +425,7 @@ function spawnBead(k) {
   let hy = H / 2;
   for (let i = 0; i < 60; i++) {
     hx = 40 + Math.random() * (W - 80);
-    hy = 150 + Math.random() * (H - 200);
+    hy = 150 + Math.random() * (H - 260);
     if (Math.hypot(hx - ANCHOR.x, hy - ANCHOR.y) < reach && Math.hypot(hx - S.tip.x, hy - S.tip.y) > 90) break;
   }
   const r = Math.hypot(hx - ANCHOR.x, hy - ANCHOR.y);

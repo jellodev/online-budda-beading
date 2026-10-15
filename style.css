@@ -79,7 +79,7 @@ html, body {
   transition: opacity 0.6s ease;
 }
 .quote {
-  bottom: calc(max(16px, env(safe-area-inset-bottom)) + 56px);
+  bottom: calc(max(16px, env(safe-area-inset-bottom)) + 16px);
   font-family: var(--serif);
   font-size: 17px;
   line-height: 1.55;
@@ -96,12 +96,14 @@ html, body {
 
 .tools {
   position: fixed;
-  bottom: max(14px, env(safe-area-inset-bottom));
-  left: 16px;
+  top: calc(max(14px, env(safe-area-inset-top)) + 64px);
   right: 16px;
   display: flex;
-  justify-content: center;
-  gap: 8px;
+  gap: 6px;
+}
+.tools button {
+  font-size: 12px;
+  padding: 6px 10px;
 }
 
 button {
