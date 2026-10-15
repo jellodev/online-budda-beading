@@ -196,7 +196,7 @@ function freshState(phase, n0, elapsed, drops, peak) {
 }
 
 function difficulty() {
-  return clamp(S.strung.length / (TOTAL - 1), 0, 1);
+  return Math.sqrt(clamp(S.strung.length / (TOTAL - 1), 0, 1));
 }
 function ease() {
   return clamp(1 - S.strung.length / EASY_UNTIL, 0, 1);
