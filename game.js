@@ -10,10 +10,13 @@ const TARGET_R = 13;
 const BASE_LEN = 430;
 const LEN_PER_BEAD = 6;
 const EASY_UNTIL = 10;
+const SAFE_DEPTH = 0.72;
 const ROPE_G = 0.32;
 const BEAD_G = 0.24;
 const MU_S = 0.26;
 const MU_K = 0.14;
+const BEAD_DAMP = 0.96;
+const BEAD_VMAX = 4;
 const STEP = 1 / 60;
 const SAVE_KEY = 'yeomju108.save';
 const BEST_KEY = 'yeomju108.best';
@@ -381,7 +384,7 @@ function updateStrung() {
   B.forEach((b, i) => {
     const p = sampleAt(b.s);
     const resting = Math.abs(b.v) < 0.03 && Math.abs(p.ty) < MU_S;
-    const u = resting ? 0 : (b.v + BEAD_G * p.ty - Math.sign(b.v || p.ty) * BEAD_G * MU_K * Math.abs(p.tx)) * 0.992;
+    const u = resting ? 0 : (b.v + BEAD_G * p.ty - Math.sign(b.v || p.ty) * BEAD_G * MU_K * Math.abs(p.tx)) * BEAD_DAMP;
     if (b.grow < 1) b.grow = Math.min(1, b.grow + 0.06);
     let g = { first: i, n: 1, sum: u };
     while (groups.length) {
@@ -394,7 +397,7 @@ function updateStrung() {
     groups.push(g);
   });
   for (const g of groups) {
-    const v = clamp(g.sum / g.n, -9, 9);
+    const v = clamp(g.sum / g.n, -BEAD_VMAX, BEAD_VMAX);
     for (let i = g.first; i < g.first + g.n; i++) {
       B[i].v = v;
       B[i].s += v;
@@ -413,7 +416,14 @@ function updateStrung() {
     B[0].v = Math.max(0, B[0].v);
   }
   for (let i = 1; i < B.length; i++) B[i].s = Math.max(B[i].s, B[i - 1].s + SPACING);
+  const tipUp = needleDir().y < -0.3;
   while (B.length && B[B.length - 1].s > S.poly.total) {
+    const last = B[B.length - 1];
+    if (last.v <= 0 || tipUp) {
+      last.s = S.poly.total;
+      last.v = Math.min(last.v, 0);
+      break;
+    }
     const b = B.pop();
     const p = sampleAt(S.poly.total);
     S.falling.push({ x: p.x, y: p.y, vx: p.tx * b.v + S.tipVel.x * 0.5, vy: p.ty * b.v + S.tipVel.y * 0.5 });
@@ -439,13 +449,22 @@ function placeStack(n) {
   S.strung = Array.from({ length: n }, (_, i) => ({ s: start + i * SPACING, v: 0, grow: 1 }));
 }
 
+function safeEyeY() {
+  const freeRope = BASE_LEN + LEN_PER_BEAD * S.peak - S.strung.length * SPACING;
+  return ANCHOR.y + SAFE_DEPTH * freeRope;
+}
+
 function spawnBead(k) {
   const reach = S.len * (0.8 - 0.3 * ease());
+  const spin = S.strung.length < 10 ? 0 : (0.004 + 0.02 * k) * (Math.random() < 0.5 ? -1 : 1);
+  const theta = Math.random() * Math.PI;
+  const lift = spin ? 0 : (NEEDLE_LEN + 24) * Math.abs(Math.sin(theta));
+  const maxY = Math.max(150, Math.min(H - 110, safeEyeY() - (3 + 22 * k) - lift - 6));
   let hx = W / 2;
   let hy = H / 2;
   for (let i = 0; i < 60; i++) {
     hx = 40 + Math.random() * (W - 80);
-    hy = 150 + Math.random() * (H - 260);
+    hy = 150 + Math.random() * (maxY - 150);
     if (Math.hypot(hx - ANCHOR.x, hy - ANCHOR.y) < reach && Math.hypot(hx - S.tip.x, hy - S.tip.y) > 90) break;
   }
   const r = Math.hypot(hx - ANCHOR.x, hy - ANCHOR.y);
@@ -453,10 +472,9 @@ function spawnBead(k) {
     hx = ANCHOR.x + (hx - ANCHOR.x) * reach / r;
     hy = ANCHOR.y + (hy - ANCHOR.y) * reach / r;
   }
-  const spin = S.strung.length < 10 ? 0 : (0.004 + 0.02 * k) * (Math.random() < 0.5 ? -1 : 1);
   S.bead = {
     hx, hy, x: hx, y: hy, px: hx, py: hy,
-    theta: Math.random() * Math.PI, spin,
+    theta, spin,
     ph1: Math.random() * 6.28, ph2: Math.random() * 6.28,
     kx: 0, ky: 0, kvx: 0, kvy: 0, life: 0,
   };
