@@ -197,6 +197,39 @@ h2 { font-size: 26px; }
   color: rgba(244, 234, 216, 0.4);
 }
 
+.congrats {
+  margin: 10px 0 0;
+  font-family: var(--serif);
+  font-size: 16px;
+  line-height: 1.6;
+  color: var(--ink-dim);
+}
+
+.promo {
+  display: block;
+  margin-top: 18px;
+  padding: 14px 16px;
+  border-radius: 14px;
+  border: 1px solid rgba(232, 184, 92, 0.45);
+  background: rgba(232, 184, 92, 0.08);
+  color: var(--ink);
+  text-decoration: none;
+  transition: background 0.2s ease;
+}
+.promo:hover { background: rgba(232, 184, 92, 0.16); }
+.promo-label {
+  display: block;
+  font-size: 11px;
+  letter-spacing: 0.15em;
+  color: var(--gold);
+}
+.promo-title {
+  display: block;
+  margin-top: 4px;
+  font-family: var(--serif);
+  font-size: 18px;
+}
+
 .stats {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
