@@ -147,7 +147,8 @@ let S = freshState('intro', 0, 0, 0, 0);
 function freshState(phase, n0, elapsed, drops, peak) {
   const eye = { x: ANCHOR.x + 80, y: ANCHOR.y + 90 };
   const tip = { x: eye.x, y: eye.y - NEEDLE_LEN };
-  const len = BASE_LEN + LEN_PER_BEAD * n0;
+  const top = Math.max(peak, n0);
+  const len = BASE_LEN + LEN_PER_BEAD * top;
   const rope = [];
   for (let i = 0; i <= SEGMENTS; i++) {
     const t = i / SEGMENTS;
@@ -156,7 +157,7 @@ function freshState(phase, n0, elapsed, drops, peak) {
     rope.push({ x, y, px: x, py: y });
   }
   return {
-    phase, strung: [], elapsed, drops, peak: Math.max(peak, n0),
+    phase, strung: [], elapsed, drops, peak: top,
     falling: [], floats: [],
     frame: 0, tip, tipPrev: { ...tip }, tipVel: { x: 0, y: 0 }, eye, target: { ...tip },
     len, rope, poly: null, bead: null, spawnIn: 40,
@@ -286,7 +287,7 @@ function updateNeedle(k) {
 }
 
 function updateRope() {
-  S.len += (BASE_LEN + LEN_PER_BEAD * S.strung.length - S.len) * 0.05;
+  S.len += (BASE_LEN + LEN_PER_BEAD * S.peak - S.len) * 0.05;
   const rope = S.rope;
   const seg = S.len / SEGMENTS;
   for (let i = 1; i < SEGMENTS; i++) {
@@ -405,7 +406,6 @@ function updateStrung() {
 }
 
 function placeStack(n) {
-  S.strung = Array.from({ length: n }, () => ({ s: 0, v: 0, grow: 1 }));
   for (let i = 0; i < 300; i++) updateRope();
   buildPoly();
   let low = 0;
@@ -416,7 +416,7 @@ function placeStack(n) {
     low = S.poly.cum[i];
   }
   const start = clamp(low - ((n - 1) / 2) * SPACING, BEAD_R + 3, S.poly.eyeS - n * SPACING);
-  S.strung.forEach((b, i) => { b.s = start + i * SPACING; });
+  S.strung = Array.from({ length: n }, (_, i) => ({ s: start + i * SPACING, v: 0, grow: 1 }));
 }
 
 function spawnBead(k) {
