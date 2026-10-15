@@ -12,6 +12,11 @@ const LEN_PER_BEAD = 6;
 const EASY_UNTIL = 10;
 const SAFE_DEPTH = 0.6;
 const SAFE_DEPTH_LATE = 0.72;
+const TIMED_FROM = 90;
+const TIMED_FRAMES = 8 * 60;
+const WARN_FRAMES = 2 * 60;
+const FADE_FRAMES = 20;
+const HOLD_DIST = 40;
 const ROPE_G = 0.32;
 const BEAD_G = 0.22;
 const MU_S = 0.29;
@@ -36,6 +41,7 @@ const MILESTONES = {
   27: '사분의 일. 아직 81번뇌가 남았습니다.',
   54: '반. 여기서 그만두는 것도 깨달음일 수 있습니다.',
   81: '사분의 삼. 실이 무거워졌다면, 그건 기분 탓이 아닙니다.',
+  90: '아흔 알. 이제 알도 오래 기다려 주지 않습니다.',
   100: '여덟 알. 지금 떨구면 정말 웃길 것 같습니다.',
 };
 
@@ -130,6 +136,7 @@ const sfx = {
   thread() { tone(1250, 0.07, 'triangle', 0.22, 900); tone(2500, 0.04, 'sine', 0.06); },
   hit() { tone(190, 0.1, 'sine', 0.3, 90); },
   drop() { tone(2100 + Math.random() * 900, 0.18, 'sine', 0.05, 1500); },
+  vanish() { tone(700, 0.18, 'sine', 0.12, 2600); },
   moktak(times = 1) {
     for (let i = 0; i < times; i++) {
       tone(520, 0.32, 'sine', 0.45, 360, i * 0.42);
@@ -495,6 +502,19 @@ function updateBead(k) {
   b.ky += b.kvy;
   b.x = b.hx + Math.sin(S.frame * 0.017 + b.ph2) * 34 * k + b.kx;
   b.y = b.hy + Math.sin(S.frame * 0.031 + b.ph1) * (3 + 22 * k) + b.ky;
+  const near = Math.hypot(S.tip.x - b.x, S.tip.y - b.y) < HOLD_DIST;
+  if (S.phase === 'play' && timeLeft(b) <= 0 && !near) teleportBead(b, k);
+}
+
+function timeLeft(b) {
+  if (S.strung.length < TIMED_FROM) return Infinity;
+  return TIMED_FRAMES - (b.life - FADE_FRAMES);
+}
+
+function teleportBead(b, k) {
+  S.floats.push({ x: b.x, y: b.y - 18, text: '휙', life: 45, color: '#e8b85c', size: 22 });
+  sfx.vanish();
+  spawnBead(k);
 }
 
 function needleDir() {
@@ -508,7 +528,7 @@ function isAligned(b, k) {
 
 function checkThread(k) {
   const b = S.bead;
-  if (!b || b.life < 20 || S.phase !== 'play') return;
+  if (!b || b.life < FADE_FRAMES || S.phase !== 'play') return;
   const ax = Math.cos(b.theta);
   const ay = Math.sin(b.theta);
   const r0x = S.tipPrev.x - b.px;
@@ -722,13 +742,23 @@ function drawTarget() {
   const b = S.bead;
   if (!b) return;
   const k = difficulty();
-  const fade = Math.min(1, b.life / 20);
+  const fade = Math.min(1, b.life / FADE_FRAMES);
+  const left = timeLeft(b);
   const near = Math.hypot(S.tip.x - b.x, S.tip.y - b.y) < 140;
   const aligned = near && isAligned(b, k);
   const hole = Math.max(2.2, holeTol(k) * 0.55);
   ctx.save();
   ctx.globalAlpha = fade;
   ctx.translate(b.x, b.y);
+  if (Number.isFinite(left)) {
+    const warn = left < WARN_FRAMES;
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = warn ? '#ff5a4a' : 'rgba(232, 184, 92, 0.8)';
+    ctx.beginPath();
+    ctx.arc(0, 0, TARGET_R + 6, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * clamp(left / TIMED_FRAMES, 0, 1));
+    ctx.stroke();
+    if (warn) ctx.globalAlpha = fade * (0.4 + 0.6 * Math.abs(Math.sin(S.frame * 0.3)));
+  }
   ctx.rotate(b.theta);
   ctx.setLineDash([3, 6]);
   ctx.lineWidth = 1;
