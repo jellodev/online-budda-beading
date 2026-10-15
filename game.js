@@ -28,6 +28,7 @@ const CHAPTERS = [
 
 const MILESTONES = {
   10: '열 알. 이제 알이 돌기 시작합니다. 세상도 원래 돌고 있었습니다.',
+  20: '스무 알. 어디선가 반야심경이 들려옵니다.',
   27: '사분의 일. 아직 81번뇌가 남았습니다.',
   54: '반. 여기서 그만두는 것도 깨달음일 수 있습니다.',
   81: '사분의 삼. 실이 무거워졌다면, 그건 기분 탓이 아닙니다.',
@@ -53,6 +54,24 @@ const LAMENT_BIG = [
   '색즉시공. 방금 그 알들이 공이 되었습니다.',
   '이것이 무상(無常)입니다. 교과서에 실릴 만한.',
   '숨을 들이쉬고… 내쉬고… 화면을 닫지 마세요.',
+];
+
+const CHANT_FROM = 20;
+const BEAT_SEC = 0.8;
+const SUTRA = [
+  '마하반야바라밀다심경',
+  '관자재보살 행심반야바라밀다시 조견오온개공 도일체고액',
+  '사리자 색불이공 공불이색 색즉시공 공즉시색 수상행식 역부여시',
+  '사리자 시제법공상 불생불멸 불구부정 부증불감',
+  '시고 공중무색 무수상행식 무안이비설신의 무색성향미촉법 무안계 내지 무의식계',
+  '무무명 역무무명진 내지 무노사 역무노사진 무고집멸도 무지역무득 이무소득고',
+  '보리살타 의반야바라밀다고 심무가애 무가애고 무유공포 원리전도몽상 구경열반',
+  '삼세제불 의반야바라밀다고 득아뇩다라삼먁삼보리',
+  '고지반야바라밀다 시대신주 시대명주 시무상주 시무등등주 능제일체고 진실불허',
+  '고설반야바라밀다주 즉설주왈',
+  '아제아제 바라아제 바라승아제 모지 사바하',
+  '아제아제 바라아제 바라승아제 모지 사바하',
+  '아제아제 바라아제 바라승아제 모지 사바하',
 ];
 
 const $ = (id) => document.getElementById(id);
@@ -161,7 +180,7 @@ function freshState(phase, n0, elapsed, drops, peak) {
     falling: [], floats: [],
     frame: 0, tip, tipPrev: { ...tip }, tipVel: { x: 0, y: 0 }, eye, target: { ...tip },
     len, rope, poly: null, bead: null, spawnIn: 40,
-    lossCount: 0, lossTimer: 0, finishT: 0, ringFrom: null, resultShown: false,
+    lossCount: 0, lossTimer: 0, lossFloat: null, flash: 0, finishT: 0, ringFrom: null, resultShown: false,
   };
 }
 
@@ -402,6 +421,7 @@ function updateStrung() {
     S.lossCount++;
     S.lossTimer = 70;
     sfx.drop();
+    showLoss();
   }
 }
 
@@ -529,14 +549,33 @@ function updateFalling() {
 function updateFloats() {
   for (const f of S.floats) {
     f.life--;
-    f.y -= 0.5;
+    f.y -= f.rise ?? 0.5;
+    if (f.pop) f.pop--;
   }
   S.floats = S.floats.filter((f) => f.life > 0);
+  if (S.flash > 0) S.flash = Math.max(0, S.flash - 0.05);
+}
+
+function showLoss() {
+  const x = clamp(S.tip.x, 40, W - 40);
+  const y = clamp(S.tip.y - 26, 60, H - 40);
+  const size = Math.min(34 + S.lossCount * 3, 72);
+  if (S.lossFloat && S.lossFloat.life > 0) {
+    Object.assign(S.lossFloat, { x, y, text: `-${S.lossCount}`, size, life: 80, pop: 8 });
+  } else {
+    S.lossFloat = { x, y, text: `-${S.lossCount}`, size, life: 80, pop: 8, rise: 0.2, color: '#ff4d3d' };
+    S.floats.push(S.lossFloat);
+  }
+  S.flash = 1;
+  vibrate(30);
+  const el = hudEls.drops;
+  el.classList.remove('hit');
+  void el.offsetWidth;
+  el.classList.add('hit');
 }
 
 function lament(k) {
   if (S.phase !== 'play' || k <= 0) return;
-  S.floats.push({ x: W / 2, y: 170, text: `-${k}`, life: 110, color: '#ff8a7a', size: 20 + Math.min(k, 40) });
   if (k >= 15) sayQuote(pick(LAMENT_BIG), 4200);
   else if (k >= 4) sayQuote(pick(LAMENT_MID), 3600);
   else if (Math.random() < 0.6) sayQuote(pick(LAMENT_SMALL), 3000);
@@ -600,6 +639,11 @@ function render() {
   }
   for (const p of S.falling) ctx.drawImage(beadSprite, p.x - BEAD_R, p.y - BEAD_R, BEAD_R * 2, BEAD_R * 2);
   drawFloats();
+  if (S.flash > 0) {
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.fillStyle = `rgba(255, 60, 50, ${0.22 * S.flash})`;
+    ctx.fillRect(0, 0, cw, ch);
+  }
 }
 
 function drawAnchor() {
@@ -724,7 +768,7 @@ function drawFloats() {
   for (const f of S.floats) {
     ctx.globalAlpha = Math.min(1, f.life / 30);
     ctx.fillStyle = f.color;
-    ctx.font = `${f.size}px "ChosunGs", serif`;
+    ctx.font = `${f.size * (1 + (f.pop || 0) * 0.05)}px "ChosunGs", serif`;
     ctx.fillText(f.text, f.x, f.y);
   }
   ctx.globalAlpha = 1;
@@ -912,9 +956,69 @@ function begin(saved) {
   $('intro').hidden = true;
   $('result').hidden = true;
   audioCtx();
+  unlockSpeech();
   sfx.moktak(1);
   track('game_start', { mode: saved ? 'continue' : 'new', beads: S.strung.length });
   sayQuote(saved ? '다시 오셨군요. 번뇌는 그대로 기다리고 있었습니다.' : '바늘 끝이 가는 곳으로, 마음도 갑니다.', 3600);
+}
+
+const bgm = { nextBeat: 0, chanting: false, session: 0, line: 0, voice: null };
+
+function pickVoice() {
+  if (!('speechSynthesis' in window)) return null;
+  const voices = speechSynthesis.getVoices();
+  return voices.find((v) => v.lang === 'ko-KR') || voices.find((v) => v.lang.startsWith('ko')) || null;
+}
+
+function unlockSpeech() {
+  if (!('speechSynthesis' in window)) return;
+  const u = new SpeechSynthesisUtterance(' ');
+  u.volume = 0;
+  speechSynthesis.speak(u);
+}
+
+function bgmOn() {
+  return !audio.muted && S.phase === 'play' && !document.hidden;
+}
+
+function scheduleMoktak() {
+  const a = audio.ctx;
+  if (!a || !bgmOn()) {
+    bgm.nextBeat = 0;
+    return;
+  }
+  if (bgm.nextBeat < a.currentTime) bgm.nextBeat = a.currentTime + 0.05;
+  while (bgm.nextBeat < a.currentTime + 0.3) {
+    const delay = bgm.nextBeat - a.currentTime;
+    tone(560, 0.18, 'sine', 0.14, 420, delay);
+    tone(1100, 0.04, 'triangle', 0.04, null, delay);
+    bgm.nextBeat += BEAT_SEC;
+  }
+}
+
+function chantNext(session) {
+  if (!bgm.chanting || session !== bgm.session) return;
+  const u = new SpeechSynthesisUtterance(SUTRA[bgm.line]);
+  u.voice = bgm.voice;
+  u.lang = 'ko-KR';
+  u.rate = 0.7;
+  u.pitch = 0.4;
+  u.volume = 0.6;
+  u.onend = () => {
+    bgm.line = (bgm.line + 1) % SUTRA.length;
+    setTimeout(() => chantNext(session), 700);
+  };
+  speechSynthesis.speak(u);
+}
+
+function updateChant() {
+  bgm.voice = bgm.voice || pickVoice();
+  const want = Boolean(bgm.voice) && bgmOn() && S.strung.length >= CHANT_FROM;
+  if (want === bgm.chanting) return;
+  bgm.chanting = want;
+  bgm.session++;
+  if (want) chantNext(bgm.session);
+  else speechSynthesis.cancel();
 }
 
 function syncSoundButton() {
@@ -984,5 +1088,9 @@ function loop(now) {
 
 resize();
 syncSoundButton();
+setInterval(() => {
+  scheduleMoktak();
+  updateChant();
+}, 100);
 initIntro();
 requestAnimationFrame(loop);

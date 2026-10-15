@@ -65,7 +65,12 @@ html, body {
   font-variant-numeric: tabular-nums;
 }
 .meta #time { font-size: 18px; color: var(--ink); }
-.meta b { color: #ff8a7a; font-weight: 700; }
+.meta b { color: #ff8a7a; font-weight: 700; display: inline-block; }
+.meta b.hit { animation: hit 0.5s ease-out; }
+@keyframes hit {
+  0% { transform: scale(1.9); color: #ff3b2f; }
+  100% { transform: scale(1); }
+}
 
 .quote, .toast {
   position: fixed;
