@@ -773,21 +773,46 @@ function toast(text) {
   toastTimer = setTimeout(() => el.classList.remove('on'), 1800);
 }
 
+const RECORD_ALPHABET = '0123456789abcdefghijklmnopqrstuvwxyz';
+const RECORD_WIDTHS = [2, 4, 5];
+const RECORD_CHECK_WIDTH = 3;
+const RECORD_LENGTH = RECORD_CHECK_WIDTH + RECORD_WIDTHS.reduce((a, b) => a + b, 0);
+
+function recordCheck(body) {
+  let h = 0x811c9dc5;
+  for (const ch of `yeomju108:${body}`) h = Math.imul(h ^ ch.charCodeAt(0), 0x01000193) >>> 0;
+  return (h % 36 ** RECORD_CHECK_WIDTH).toString(36).padStart(RECORD_CHECK_WIDTH, '0');
+}
+
+function scramble(text, dir) {
+  return [...text].map((c, i) => RECORD_ALPHABET[(RECORD_ALPHABET.indexOf(c) + dir * (i * 7 + 13) + 36 * 36) % 36]).join('');
+}
+
+function encodeRecord(n, d, t) {
+  const body = [n, d, t].map((v, i) => clamp(Math.round(v), 0, 36 ** RECORD_WIDTHS[i] - 1).toString(36).padStart(RECORD_WIDTHS[i], '0')).join('');
+  return scramble(recordCheck(body) + body, 1);
+}
+
+function decodeRecord(token) {
+  if (!token || !new RegExp(`^[0-9a-z]{${RECORD_LENGTH}}$`).test(token)) return null;
+  const plain = scramble(token, -1);
+  const body = plain.slice(RECORD_CHECK_WIDTH);
+  if (plain.slice(0, RECORD_CHECK_WIDTH) !== recordCheck(body)) return null;
+  let at = 0;
+  const [n, d, t] = RECORD_WIDTHS.map((w) => Number.parseInt(body.slice(at, (at += w)), 36));
+  if (n > TOTAL) return null;
+  return { n, d, t: n === TOTAL ? t : 0 };
+}
+
 function shareUrl() {
   const u = new URL(location.pathname, location.origin);
-  u.searchParams.set('n', S.phase === 'done' ? TOTAL : S.strung.length);
-  u.searchParams.set('d', S.drops);
-  if (S.phase === 'done') u.searchParams.set('t', Math.round(S.elapsed));
+  const done = S.phase === 'done';
+  u.searchParams.set('r', encodeRecord(done ? TOTAL : S.strung.length, S.drops, done ? S.elapsed : 0));
   return u.toString();
 }
 
 function readChallenge() {
-  const p = new URLSearchParams(location.search);
-  const n = Number.parseInt(p.get('n'), 10);
-  if (!(n >= 0 && n <= TOTAL)) return null;
-  const d = Math.max(0, Number.parseInt(p.get('d'), 10) || 0);
-  const t = Number.parseInt(p.get('t'), 10);
-  return { n, d, t: n === TOTAL && t > 0 ? t : 0 };
+  return decodeRecord(new URLSearchParams(location.search).get('r'));
 }
 
 function shareText() {
@@ -801,7 +826,7 @@ async function share() {
   const url = shareUrl();
   if (navigator.share) {
     try {
-      await navigator.share({ title: '108번뇌 꿰기', text, url });
+      await navigator.share({ title: '108번뇌 꿰기', url });
       return;
     } catch (e) {
       if (e && e.name === 'AbortError') return;
