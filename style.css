@@ -171,6 +171,18 @@ h2 { font-size: 26px; }
   color: var(--ink-dim);
 }
 
+.challenge {
+  margin: -6px 0 16px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid rgba(232, 184, 92, 0.45);
+  background: rgba(232, 184, 92, 0.1);
+  font-family: var(--serif);
+  font-size: 16px;
+  line-height: 1.55;
+}
+.challenge[hidden] { display: none; }
+
 .howto {
   list-style: none;
   margin: 0 0 22px;

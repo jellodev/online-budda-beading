@@ -773,8 +773,21 @@ function toast(text) {
   toastTimer = setTimeout(() => el.classList.remove('on'), 1800);
 }
 
-function pageUrl() {
-  return location.href.split('#')[0];
+function shareUrl() {
+  const u = new URL(location.pathname, location.origin);
+  u.searchParams.set('n', S.phase === 'done' ? TOTAL : S.strung.length);
+  u.searchParams.set('d', S.drops);
+  if (S.phase === 'done') u.searchParams.set('t', Math.round(S.elapsed));
+  return u.toString();
+}
+
+function readChallenge() {
+  const p = new URLSearchParams(location.search);
+  const n = Number.parseInt(p.get('n'), 10);
+  if (!(n >= 0 && n <= TOTAL)) return null;
+  const d = Math.max(0, Number.parseInt(p.get('d'), 10) || 0);
+  const t = Number.parseInt(p.get('t'), 10);
+  return { n, d, t: n === TOTAL && t > 0 ? t : 0 };
 }
 
 function shareText() {
@@ -785,7 +798,7 @@ function shareText() {
 async function share() {
   const text = shareText();
   track('share', { phase: S.phase, beads: S.strung.length });
-  const url = pageUrl();
+  const url = shareUrl();
   if (navigator.share) {
     try {
       await navigator.share({ title: '108번뇌 꿰기', text, url });
@@ -884,6 +897,14 @@ function syncSoundButton() {
 }
 
 function initIntro() {
+  const challenge = readChallenge();
+  if (challenge) {
+    const el = $('challenge');
+    el.textContent = challenge.t
+      ? `친구가 108알을 ${formatTimeKo(challenge.t)} 만에 다 꿰었습니다. 떨군 알 ${challenge.d}개. 당신은?`
+      : `친구가 ${challenge.n}알까지 꿰었습니다. 떨군 알 ${challenge.d}개. 당신은?`;
+    el.hidden = false;
+  }
   const saved = load(SAVE_KEY);
   const btn = $('btn-continue');
   if (saved && saved.n > 0) {
