@@ -11,9 +11,10 @@ const BASE_LEN = 430;
 const LEN_PER_BEAD = 6;
 const EASY_UNTIL = 10;
 const SAFE_DEPTH = 0.6;
+const SAFE_DEPTH_LATE = 0.72;
 const ROPE_G = 0.32;
-const BEAD_G = 0.2;
-const MU_S = 0.32;
+const BEAD_G = 0.22;
+const MU_S = 0.29;
 const MU_K = 0.14;
 const BEAD_DAMP = 0.96;
 const BEAD_VMAX = 4;
@@ -193,7 +194,7 @@ function difficulty() {
 function ease() {
   return clamp(1 - S.strung.length / EASY_UNTIL, 0, 1);
 }
-const holeTol = (k) => 10 - 4.5 * k + 3 * ease();
+const holeTol = (k) => 10 - 5 * k + 3 * ease();
 const alignCos = (k) => 0.82 + 0.13 * k - 0.2 * ease();
 
 function resize() {
@@ -274,7 +275,7 @@ function update() {
 
 function updateNeedle(k) {
   const f = S.frame;
-  const amp = S.phase === 'play' ? 0.3 + 1.8 * k : 0;
+  const amp = S.phase === 'play' ? 0.3 + 2.3 * k : 0;
   const maxR = S.len * 0.96;
   const tdx = S.target.x - ANCHOR.x;
   const tdy = S.target.y - ANCHOR.y;
@@ -451,12 +452,12 @@ function placeStack(n) {
 
 function safeEyeY() {
   const freeRope = BASE_LEN + LEN_PER_BEAD * S.peak - S.strung.length * SPACING;
-  return ANCHOR.y + SAFE_DEPTH * freeRope;
+  return ANCHOR.y + (SAFE_DEPTH + (SAFE_DEPTH_LATE - SAFE_DEPTH) * difficulty()) * freeRope;
 }
 
 function spawnBead(k) {
   const reach = S.len * (0.8 - 0.3 * ease());
-  const spin = S.strung.length < 10 ? 0 : (0.004 + 0.02 * k) * (Math.random() < 0.5 ? -1 : 1);
+  const spin = S.strung.length < 10 ? 0 : (0.004 + 0.024 * k) * (Math.random() < 0.5 ? -1 : 1);
   const theta = Math.random() * Math.PI;
   const lift = spin ? 0 : (NEEDLE_LEN + 24) * Math.abs(Math.sin(theta));
   const maxY = Math.max(150, Math.min(H - 110, safeEyeY() - (3 + 22 * k) - lift - 6));
