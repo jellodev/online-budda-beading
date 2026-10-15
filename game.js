@@ -510,7 +510,7 @@ function checkThread(k) {
 
 function threadBead() {
   S.strung.push({ s: S.poly.total - NEEDLE_LEN * 0.35, v: -0.6, grow: 0 });
-  S.floats.push({ x: S.bead.x, y: S.bead.y - 22, text: `${S.strung.length}`, life: 60, color: '#e8b85c', size: 18 });
+  S.floats.push({ x: S.bead.x, y: S.bead.y - 22, text: `${S.strung.length}`, life: 60, color: '#e8b85c', size: 24 });
   S.bead = null;
   S.spawnIn = 45;
   sfx.thread();
