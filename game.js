@@ -10,10 +10,10 @@ const TARGET_R = 13;
 const BASE_LEN = 430;
 const LEN_PER_BEAD = 6;
 const EASY_UNTIL = 10;
-const SAFE_DEPTH = 0.72;
+const SAFE_DEPTH = 0.6;
 const ROPE_G = 0.32;
-const BEAD_G = 0.24;
-const MU_S = 0.26;
+const BEAD_G = 0.2;
+const MU_S = 0.32;
 const MU_K = 0.14;
 const BEAD_DAMP = 0.96;
 const BEAD_VMAX = 4;
@@ -193,7 +193,7 @@ function difficulty() {
 function ease() {
   return clamp(1 - S.strung.length / EASY_UNTIL, 0, 1);
 }
-const holeTol = (k) => 10 - 5.5 * k + 3 * ease();
+const holeTol = (k) => 10 - 4.5 * k + 3 * ease();
 const alignCos = (k) => 0.82 + 0.13 * k - 0.2 * ease();
 
 function resize() {
@@ -274,7 +274,7 @@ function update() {
 
 function updateNeedle(k) {
   const f = S.frame;
-  const amp = S.phase === 'play' ? 0.3 + 2.6 * k : 0;
+  const amp = S.phase === 'play' ? 0.3 + 1.8 * k : 0;
   const maxR = S.len * 0.96;
   const tdx = S.target.x - ANCHOR.x;
   const tdy = S.target.y - ANCHOR.y;
