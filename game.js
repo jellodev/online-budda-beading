@@ -29,9 +29,9 @@ const MUTE_KEY = 'yeomju108.muted';
 const TOLD_KEY = 'yeomju108.told';
 
 const MODES = {
-  easy: { label: '쉬움', base: 0, weight: 1, grip: 1, timedFrom: 90, darkFrom: Infinity, oneWay: 0, decoy: 0, roam: 0, cat: false },
-  normal: { label: '보통', base: 0.35, weight: 1, grip: 1, timedFrom: 90, darkFrom: Infinity, oneWay: 0, decoy: 0, roam: 0, cat: true },
-  hard: { label: '어려움', base: 0.6, weight: 1.5, grip: 0.75, timedFrom: 54, darkFrom: 54, oneWay: 0.5, decoy: 0.4, roam: 0.4, cat: true },
+  easy: { label: '쉬움', base: 0, weight: 1, grip: 1, timedFrom: 90, darkFrom: Infinity, oneWay: 0, decoy: 0, roam: 0, cat: false, guideFrom: Infinity, guideSpan: 1 },
+  normal: { label: '보통', base: 0.35, weight: 1, grip: 1, timedFrom: 90, darkFrom: Infinity, oneWay: 0, decoy: 0, roam: 0, cat: true, guideFrom: 54, guideSpan: 108 },
+  hard: { label: '어려움', base: 0.6, weight: 1.5, grip: 0.75, timedFrom: 54, darkFrom: 54, oneWay: 0.5, decoy: 0.4, roam: 0.4, cat: true, guideFrom: 27, guideSpan: 54 },
 };
 const MODE_KEYS = Object.keys(MODES);
 
@@ -295,6 +295,10 @@ function difficulty() {
 }
 function ease() {
   return clamp(1 - S.strung.length / EASY_UNTIL, 0, 1);
+}
+function guide() {
+  const { guideFrom, guideSpan } = MODES[S.mode];
+  return clamp(1 - (S.strung.length - guideFrom) / guideSpan, 0, 1);
 }
 const holeTol = (k) => 10 - 5 * k + 3 * ease();
 const alignCos = (k) => 0.82 + 0.13 * k - 0.2 * ease();
@@ -1087,7 +1091,8 @@ function drawTarget(b) {
   const fade = Math.min(1, b.life / FADE_FRAMES);
   const left = b.decoy ? Infinity : timeLeft(b);
   const near = Math.hypot(S.tip.x - b.x, S.tip.y - b.y) < 140;
-  const aligned = near && isAligned(b, k);
+  const g = guide();
+  const aligned = g > 0 && near && isAligned(b, k);
   const hole = Math.max(2.2, holeTol(k) * 0.55);
   ctx.save();
   ctx.globalAlpha = fade;
@@ -1102,16 +1107,18 @@ function drawTarget(b) {
     if (warn) ctx.globalAlpha = fade * (0.4 + 0.6 * Math.abs(Math.sin(S.frame * 0.3)));
   }
   ctx.rotate(b.theta);
-  ctx.setLineDash([3, 6]);
-  ctx.lineWidth = 1;
-  ctx.strokeStyle = aligned ? 'rgba(255, 214, 120, 0.85)' : 'rgba(255, 255, 255, 0.14)';
-  ctx.beginPath();
-  ctx.moveTo(-80, 0);
-  ctx.lineTo(80, 0);
-  ctx.stroke();
-  ctx.setLineDash([]);
+  if (g > 0) {
+    ctx.setLineDash([3, 6]);
+    ctx.lineWidth = 1;
+    ctx.strokeStyle = aligned ? `rgba(255, 214, 120, ${0.85 * g})` : `rgba(255, 255, 255, ${0.14 * g})`;
+    ctx.beginPath();
+    ctx.moveTo(-80 * g, 0);
+    ctx.lineTo(80 * g, 0);
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
   if (aligned || b.decoy) {
-    ctx.fillStyle = b.decoy ? `rgba(255, 60, 50, ${0.16 + 0.1 * Math.sin(S.frame * 0.15)})` : 'rgba(255, 214, 120, 0.12)';
+    ctx.fillStyle = b.decoy ? `rgba(255, 60, 50, ${0.16 + 0.1 * Math.sin(S.frame * 0.15)})` : `rgba(255, 214, 120, ${0.12 * g})`;
     ctx.beginPath();
     ctx.arc(0, 0, TARGET_R + 7, 0, Math.PI * 2);
     ctx.fill();
