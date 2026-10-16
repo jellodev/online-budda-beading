@@ -28,6 +28,13 @@ const SAVE_KEY = 'yeomju108.save';
 const BEST_KEY = 'yeomju108.best';
 const MUTE_KEY = 'yeomju108.muted';
 
+const MODES = {
+  easy: { label: '쉬움', base: 0 },
+  normal: { label: '보통', base: 0.35 },
+  hard: { label: '어려움', base: 0.6 },
+};
+const MODE_KEYS = Object.keys(MODES);
+
 const CHAPTERS = [
   { at: 0, top: '#141a2e', bottom: '#3a2e45' },
   { at: 27, top: '#1f2d2e', bottom: '#5c5b48' },
@@ -37,9 +44,11 @@ const CHAPTERS = [
 
 const MILESTONES = {
   10: '열 알. 이제 알이 돌기 시작합니다. 세상도 원래 돌고 있었습니다.',
-  20: '스무 알. 어디선가 반야심경이 들려옵니다.',
+  20: '스무 알. 어디선가 염불 소리가 들려옵니다.',
   27: '사분의 일. 아직 81번뇌가 남았습니다.',
+  40: '마흔 알. 친구는 몇 알이었을까요. 방금 그 생각이 번뇌 하나입니다.',
   54: '반. 여기서 그만두는 것도 깨달음일 수 있습니다.',
+  70: '일흔 알. 남보다 빨리 꿰려는 마음이 바늘을 가장 많이 흔듭니다.',
   81: '사분의 삼. 실이 무거워졌다면, 그건 기분 탓이 아닙니다.',
   90: '아흔 알. 이제 알도 오래 기다려 주지 않습니다.',
   100: '여덟 알. 지금 떨구면 정말 웃길 것 같습니다.',
@@ -52,11 +61,15 @@ const LAMENT_SMALL = [
   '집착을 내려놓으라 했지, 염주를 내려놓으란 말은 아니었는데.',
   '지금 이 순간에 집중하세요. 방금 그 순간 말고.',
   '참는 것도 수행입니다.',
+  '남의 염주 알은 세지 마세요. 내 것도 벅찹니다.',
+  '1등도 결국 한 알씩 꿰었습니다.',
 ];
 const LAMENT_MID = [
   '괜찮습니다. 모든 것은 공(空)입니다. 특히 당신의 실.',
   '부처님도 처음엔 이랬을까요. 아니겠죠.',
   '퇴근은 108알 뒤에.',
+  '순위표는 없습니다. 이기고 싶은 마음만 있을 뿐.',
+  '비교는 109번째 번뇌입니다.',
   '바늘 끝은 하늘을 향해야 합니다. 마음도요.',
 ];
 const LAMENT_BIG = [
@@ -64,25 +77,11 @@ const LAMENT_BIG = [
   '색즉시공. 방금 그 알들이 공이 되었습니다.',
   '이것이 무상(無常)입니다. 교과서에 실릴 만한.',
   '숨을 들이쉬고… 내쉬고… 화면을 닫지 마세요.',
+  '이긴 사람도 진 사람도 없습니다. 떨어진 알만 있을 뿐.',
 ];
 
-const CHANT_FROM = 20;
 const BEAT_SEC = 0.8;
-const SUTRA = [
-  '마하반야바라밀다심경',
-  '관자재보살 행심반야바라밀다시 조견오온개공 도일체고액',
-  '사리자 색불이공 공불이색 색즉시공 공즉시색 수상행식 역부여시',
-  '사리자 시제법공상 불생불멸 불구부정 부증불감',
-  '시고 공중무색 무수상행식 무안이비설신의 무색성향미촉법 무안계 내지 무의식계',
-  '무무명 역무무명진 내지 무노사 역무노사진 무고집멸도 무지역무득 이무소득고',
-  '보리살타 의반야바라밀다고 심무가애 무가애고 무유공포 원리전도몽상 구경열반',
-  '삼세제불 의반야바라밀다고 득아뇩다라삼먁삼보리',
-  '고지반야바라밀다 시대신주 시대명주 시무상주 시무등등주 능제일체고 진실불허',
-  '고설반야바라밀다주 즉설주왈',
-  '아제아제 바라아제 바라승아제 모지 사바하',
-  '아제아제 바라아제 바라승아제 모지 사바하',
-  '아제아제 바라아제 바라승아제 모지 사바하',
-];
+const CHANT_FROM = 20;
 
 const $ = (id) => document.getElementById(id);
 const canvas = $('game');
@@ -103,20 +102,72 @@ function forget(key) {
   try { localStorage.removeItem(key); } catch { return; }
 }
 
-const audio = { ctx: null, muted: load(MUTE_KEY) === true };
+const TRACKS = {
+  start: 'audio/moktak-start.m4a',
+  finish: 'audio/moktak-finish.m4a',
+  chant: 'audio/yeombul.m4a',
+};
+const audio = { ctx: null, out: null, muted: load(MUTE_KEY) === true, buffers: {}, chant: null, roll: null, rollUntil: 0 };
 
 function audioCtx() {
   if (!audio.ctx) {
     const C = window.AudioContext || window.webkitAudioContext;
     if (!C) return null;
     audio.ctx = new C();
+    audio.out = audio.ctx.createGain();
+    audio.out.connect(audio.ctx.destination);
+    syncMute();
   }
   if (audio.ctx.state === 'suspended') audio.ctx.resume();
   return audio.ctx;
 }
 
+function syncMute() {
+  if (audio.out) audio.out.gain.value = audio.muted ? 0 : 1;
+}
+
+async function loadTracks() {
+  const a = audioCtx();
+  if (!a) return;
+  await Promise.all(Object.entries(TRACKS).map(async ([name, url]) => {
+    try {
+      const res = await fetch(url);
+      const data = await res.arrayBuffer();
+      audio.buffers[name] = await new Promise((ok, fail) => a.decodeAudioData(data, ok, fail));
+    } catch {
+      return;
+    }
+  }));
+}
+
+function playTrack(name, gain, loop = false) {
+  const a = audioCtx();
+  const buffer = audio.buffers[name];
+  if (!a || !buffer) return null;
+  const src = a.createBufferSource();
+  const g = a.createGain();
+  src.buffer = buffer;
+  src.loop = loop;
+  g.gain.value = gain;
+  src.connect(g).connect(audio.out);
+  src.start();
+  return { src, g };
+}
+
+function fadeOut(track) {
+  const now = audio.ctx.currentTime;
+  track.g.gain.setTargetAtTime(0, now, 0.3);
+  track.src.stop(now + 1.5);
+}
+
+function roll(name, fallback) {
+  if (audio.roll) fadeOut(audio.roll);
+  audio.roll = playTrack(name, 0.8);
+  audio.rollUntil = audio.roll ? audio.ctx.currentTime + audio.roll.src.buffer.duration : 0;
+  if (!audio.roll) fallback();
+}
+
 function tone(freq, dur, type, gain, slideTo, delay = 0) {
-  if (audio.muted) return;
   const a = audioCtx();
   if (!a) return;
   const t = a.currentTime + delay;
@@ -127,7 +178,7 @@ function tone(freq, dur, type, gain, slideTo, delay = 0) {
   if (slideTo) o.frequency.exponentialRampToValueAtTime(slideTo, t + dur);
   g.gain.setValueAtTime(gain, t);
   g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-  o.connect(g).connect(a.destination);
+  o.connect(g).connect(audio.out);
   o.start(t);
   o.stop(t + dur + 0.02);
 }
@@ -172,9 +223,9 @@ function paintBead(g, x, y, r) {
   g.fill();
 }
 
-let S = freshState('intro', 0, 0, 0, 0);
+let S = freshState('intro', 'easy', 0, 0, 0, 0);
 
-function freshState(phase, n0, elapsed, drops, peak) {
+function freshState(phase, mode, n0, elapsed, drops, peak) {
   const eye = { x: ANCHOR.x + 80, y: ANCHOR.y + 90 };
   const tip = { x: eye.x, y: eye.y - NEEDLE_LEN };
   const top = Math.max(peak, n0);
@@ -187,7 +238,7 @@ function freshState(phase, n0, elapsed, drops, peak) {
     rope.push({ x, y, px: x, py: y });
   }
   return {
-    phase, strung: [], elapsed, drops, peak: top,
+    phase, mode, strung: [], elapsed, drops, peak: top,
     falling: [], floats: [],
     frame: 0, tip, tipPrev: { ...tip }, tipVel: { x: 0, y: 0 }, eye, target: { ...tip },
     len, rope, poly: null, bead: null, spawnIn: 40,
@@ -196,7 +247,8 @@ function freshState(phase, n0, elapsed, drops, peak) {
 }
 
 function difficulty() {
-  return Math.sqrt(clamp(S.strung.length / (TOTAL - 1), 0, 1));
+  const { base } = MODES[S.mode];
+  return base + (1 - base) * Math.sqrt(clamp(S.strung.length / (TOTAL - 1), 0, 1));
 }
 function ease() {
   return clamp(1 - S.strung.length / EASY_UNTIL, 0, 1);
@@ -631,11 +683,15 @@ function finish() {
   S.finishT = 0;
   S.ringFrom = S.strung.map((b) => sampleAt(b.s));
   forget(SAVE_KEY);
-  track('game_complete', { seconds: Math.round(S.elapsed), drops: S.drops });
-  const best = load(BEST_KEY);
-  if (!best || S.elapsed < best.time) store(BEST_KEY, { time: S.elapsed, drops: S.drops });
-  sfx.moktak(3);
+  track('game_complete', { difficulty: S.mode, seconds: Math.round(S.elapsed), drops: S.drops });
+  const best = load(bestKey(S.mode));
+  if (!best || S.elapsed < best.time) store(bestKey(S.mode), { time: S.elapsed, drops: S.drops });
+  roll('finish', () => sfx.moktak(3));
   vibrate([30, 60, 30, 60, 120]);
+}
+
+function bestKey(mode) {
+  return mode === 'easy' ? BEST_KEY : `${BEST_KEY}.${mode}`;
 }
 
 function updateFinish() {
@@ -648,7 +704,7 @@ function updateFinish() {
 
 function save() {
   if (S.phase !== 'play') return;
-  store(SAVE_KEY, { n: S.strung.length, elapsed: S.elapsed, drops: S.drops, peak: S.peak });
+  store(SAVE_KEY, { mode: S.mode, n: S.strung.length, elapsed: S.elapsed, drops: S.drops, peak: S.peak });
 }
 
 function chapterOf(n) {
@@ -867,7 +923,7 @@ function toast(text) {
 }
 
 const RECORD_ALPHABET = '0123456789abcdefghijklmnopqrstuvwxyz';
-const RECORD_WIDTHS = [2, 4, 5];
+const RECORD_WIDTHS = [1, 2, 4, 5];
 const RECORD_CHECK_WIDTH = 3;
 const RECORD_LENGTH = RECORD_CHECK_WIDTH + RECORD_WIDTHS.reduce((a, b) => a + b, 0);
 
@@ -881,8 +937,8 @@ function scramble(text, dir) {
   return [...text].map((c, i) => RECORD_ALPHABET[(RECORD_ALPHABET.indexOf(c) + dir * (i * 7 + 13) + 36 * 36) % 36]).join('');
 }
 
-function encodeRecord(n, d, t) {
-  const body = [n, d, t].map((v, i) => clamp(Math.round(v), 0, 36 ** RECORD_WIDTHS[i] - 1).toString(36).padStart(RECORD_WIDTHS[i], '0')).join('');
+function encodeRecord(m, n, d, t) {
+  const body = [m, n, d, t].map((v, i) => clamp(Math.round(v), 0, 36 ** RECORD_WIDTHS[i] - 1).toString(36).padStart(RECORD_WIDTHS[i], '0')).join('');
   return scramble(recordCheck(body) + body, 1);
 }
 
@@ -892,15 +948,15 @@ function decodeRecord(token) {
   const body = plain.slice(RECORD_CHECK_WIDTH);
   if (plain.slice(0, RECORD_CHECK_WIDTH) !== recordCheck(body)) return null;
   let at = 0;
-  const [n, d, t] = RECORD_WIDTHS.map((w) => Number.parseInt(body.slice(at, (at += w)), 36));
-  if (n > TOTAL) return null;
-  return { n, d, t: n === TOTAL ? t : 0 };
+  const [m, n, d, t] = RECORD_WIDTHS.map((w) => Number.parseInt(body.slice(at, (at += w)), 36));
+  if (n > TOTAL || !MODE_KEYS[m]) return null;
+  return { mode: MODE_KEYS[m], n, d, t: n === TOTAL ? t : 0 };
 }
 
 function shareUrl() {
   const u = new URL(location.pathname, location.origin);
   const done = S.phase === 'done';
-  u.searchParams.set('r', encodeRecord(done ? TOTAL : S.strung.length, S.drops, done ? S.elapsed : 0));
+  u.searchParams.set('r', encodeRecord(MODE_KEYS.indexOf(S.mode), done ? TOTAL : S.strung.length, S.drops, done ? S.elapsed : 0));
   return u.toString();
 }
 
@@ -909,8 +965,9 @@ function readChallenge() {
 }
 
 function shareText() {
-  if (S.phase === 'done') return `108번뇌를 ${formatTimeKo(S.elapsed)} 만에 꿰었다. 떨군 알 ${S.drops}개. 너도 성불해 봐 🙏`;
-  return `염주 ${S.strung.length}/108알 꿰는 중… 떨군 알 ${S.drops}개. 넌 108개 다 꿸 수 있을까? 🙏`;
+  const mode = MODES[S.mode].label;
+  if (S.phase === 'done') return `[${mode}] 108번뇌를 ${formatTimeKo(S.elapsed)} 만에 꿰었다. 떨군 알 ${S.drops}개. 너도 성불해 봐 🙏`;
+  return `[${mode}] 염주 ${S.strung.length}/108알 꿰는 중… 떨군 알 ${S.drops}개. 넌 108개 다 꿸 수 있을까? 🙏`;
 }
 
 async function share() {
@@ -955,7 +1012,7 @@ function makeCard() {
   g.textAlign = 'center';
   g.fillStyle = '#e8b85c';
   g.font = '700 30px "Noto Sans KR", sans-serif';
-  g.fillText('수행 완료', 540, 150);
+  g.fillText(`${MODES[S.mode].label} · 수행 완료`, 540, 150);
   g.fillStyle = '#f4ead8';
   g.font = '80px "ChosunGs", serif';
   g.fillText('108번뇌 꿰기', 540, 240);
@@ -992,39 +1049,26 @@ async function saveCard() {
 }
 
 function showResult() {
-  const best = load(BEST_KEY);
+  const best = load(bestKey(S.mode));
+  $('r-mode').textContent = MODES[S.mode].label;
   $('r-time').textContent = formatTime(S.elapsed);
   $('r-drops').textContent = `${S.drops}개`;
   $('r-best').textContent = best ? formatTime(best.time) : '-';
   $('result').hidden = false;
 }
 
-function begin(saved) {
-  S = saved ? freshState('play', saved.n, saved.elapsed, saved.drops, saved.peak || saved.n) : freshState('play', 0, 0, 0, 0);
+function begin(mode, saved) {
+  S = saved ? freshState('play', mode, saved.n, saved.elapsed, saved.drops, saved.peak || saved.n) : freshState('play', mode, 0, 0, 0, 0);
   placeStack(saved ? saved.n : 0);
   $('intro').hidden = true;
   $('result').hidden = true;
   audioCtx();
-  unlockSpeech();
-  sfx.moktak(1);
-  track('game_start', { mode: saved ? 'continue' : 'new', beads: S.strung.length });
+  roll('start', () => sfx.moktak(1));
+  track('game_start', { mode: saved ? 'continue' : 'new', difficulty: mode, beads: S.strung.length });
   sayQuote(saved ? '다시 오셨군요. 번뇌는 그대로 기다리고 있었습니다.' : '바늘 끝이 가는 곳으로, 마음도 갑니다.', 3600);
 }
 
-const bgm = { nextBeat: 0, chanting: false, session: 0, line: 0, voice: null };
-
-function pickVoice() {
-  if (!('speechSynthesis' in window)) return null;
-  const voices = speechSynthesis.getVoices();
-  return voices.find((v) => v.lang === 'ko-KR') || voices.find((v) => v.lang.startsWith('ko')) || null;
-}
-
-function unlockSpeech() {
-  if (!('speechSynthesis' in window)) return;
-  const u = new SpeechSynthesisUtterance(' ');
-  u.volume = 0;
-  speechSynthesis.speak(u);
-}
+const bgm = { nextBeat: 0 };
 
 function bgmOn() {
   return !audio.muted && S.phase === 'play' && !document.hidden;
@@ -1032,7 +1076,7 @@ function bgmOn() {
 
 function scheduleMoktak() {
   const a = audio.ctx;
-  if (!a || !bgmOn()) {
+  if (!a || !bgmOn() || audio.chant || a.currentTime < audio.rollUntil) {
     bgm.nextBeat = 0;
     return;
   }
@@ -1045,29 +1089,16 @@ function scheduleMoktak() {
   }
 }
 
-function chantNext(session) {
-  if (!bgm.chanting || session !== bgm.session) return;
-  const u = new SpeechSynthesisUtterance(SUTRA[bgm.line]);
-  u.voice = bgm.voice;
-  u.lang = 'ko-KR';
-  u.rate = 0.7;
-  u.pitch = 0.4;
-  u.volume = 0.6;
-  u.onend = () => {
-    bgm.line = (bgm.line + 1) % SUTRA.length;
-    setTimeout(() => chantNext(session), 700);
-  };
-  speechSynthesis.speak(u);
-}
-
 function updateChant() {
-  bgm.voice = bgm.voice || pickVoice();
-  const want = Boolean(bgm.voice) && bgmOn() && S.strung.length >= CHANT_FROM;
-  if (want === bgm.chanting) return;
-  bgm.chanting = want;
-  bgm.session++;
-  if (want) chantNext(bgm.session);
-  else speechSynthesis.cancel();
+  if (!audio.ctx) return;
+  const want = bgmOn() && S.strung.length >= CHANT_FROM && audio.ctx.currentTime >= audio.rollUntil;
+  if (want === Boolean(audio.chant)) return;
+  if (want) {
+    audio.chant = playTrack('chant', 0.6, true);
+    return;
+  }
+  fadeOut(audio.chant);
+  audio.chant = null;
 }
 
 function syncSoundButton() {
@@ -1078,9 +1109,10 @@ function initIntro() {
   const challenge = readChallenge();
   if (challenge) {
     const el = $('challenge');
+    const mode = MODES[challenge.mode].label;
     el.textContent = challenge.t
-      ? `친구가 108알을 ${formatTimeKo(challenge.t)} 만에 다 꿰었습니다. 떨군 알 ${challenge.d}개. 당신은?`
-      : `친구가 ${challenge.n}알까지 꿰었습니다. 떨군 알 ${challenge.d}개. 당신은?`;
+      ? `친구가 [${mode}] 108알을 ${formatTimeKo(challenge.t)} 만에 다 꿰었습니다. 떨군 알 ${challenge.d}개. 당신은?`
+      : `친구가 [${mode}] ${challenge.n}알까지 꿰었습니다. 떨군 알 ${challenge.d}개. 당신은?`;
     el.hidden = false;
   }
   const saved = load(SAVE_KEY);
@@ -1088,29 +1120,35 @@ function initIntro() {
   if (saved && saved.n > 0) {
     btn.hidden = false;
     btn.textContent = `이어하기 (${saved.n}/108)`;
-    $('btn-start').classList.remove('primary');
   }
-  btn.addEventListener('click', () => begin(load(SAVE_KEY)));
-  $('btn-start').addEventListener('click', () => {
-    forget(SAVE_KEY);
-    begin(null);
+  btn.addEventListener('click', () => {
+    const save = load(SAVE_KEY);
+    begin(save && MODE_KEYS.includes(save.mode) ? save.mode : 'easy', save);
   });
+  for (const el of document.querySelectorAll('[data-mode]')) {
+    if (!btn.hidden) el.classList.remove('primary');
+    el.addEventListener('click', () => {
+      forget(SAVE_KEY);
+      begin(el.dataset.mode, null);
+    });
+  }
 }
 
 $('btn-sound').addEventListener('click', () => {
   audio.muted = !audio.muted;
   store(MUTE_KEY, audio.muted);
+  syncMute();
   syncSoundButton();
 });
 $('btn-share').addEventListener('click', share);
 document.querySelector('.promo').addEventListener('click', () => track('promo_click'));
 $('btn-share-result').addEventListener('click', share);
 $('btn-card').addEventListener('click', saveCard);
-$('btn-again').addEventListener('click', () => begin(null));
+$('btn-again').addEventListener('click', () => begin(S.mode, null));
 $('btn-restart').addEventListener('click', () => {
   if (S.phase === 'play' && S.strung.length > 0 && !confirm(`${S.strung.length}알을 전부 내려놓고 처음부터 할까요?`)) return;
   forget(SAVE_KEY);
-  begin(null);
+  begin(S.mode, null);
 });
 
 document.addEventListener('visibilitychange', () => {
@@ -1141,5 +1179,6 @@ setInterval(() => {
   scheduleMoktak();
   updateChant();
 }, 100);
+loadTracks();
 initIntro();
 requestAnimationFrame(loop);
