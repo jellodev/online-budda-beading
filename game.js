@@ -29,9 +29,9 @@ const MUTE_KEY = 'yeomju108.muted';
 const TOLD_KEY = 'yeomju108.told';
 
 const MODES = {
-  easy: { label: '쉬움', base: 0, weight: 1, grip: 1, timedFrom: 90, darkFrom: Infinity, oneWay: 0, decoy: 0, cat: false },
-  normal: { label: '보통', base: 0.35, weight: 1, grip: 1, timedFrom: 90, darkFrom: Infinity, oneWay: 0, decoy: 0, cat: true },
-  hard: { label: '어려움', base: 0.6, weight: 1.35, grip: 0.75, timedFrom: 54, darkFrom: 81, oneWay: 0.35, decoy: 0.25, cat: true },
+  easy: { label: '쉬움', base: 0, weight: 1, grip: 1, timedFrom: 90, darkFrom: Infinity, oneWay: 0, decoy: 0, roam: 0, cat: false },
+  normal: { label: '보통', base: 0.35, weight: 1, grip: 1, timedFrom: 90, darkFrom: Infinity, oneWay: 0, decoy: 0, roam: 0, cat: true },
+  hard: { label: '어려움', base: 0.6, weight: 1.5, grip: 0.75, timedFrom: 54, darkFrom: 54, oneWay: 0.5, decoy: 0.4, roam: 0.4, cat: true },
 };
 const MODE_KEYS = Object.keys(MODES);
 
@@ -57,6 +57,7 @@ const MILESTONES = {
 const TIMED_QUOTE = '이제 알도 오래 기다려 주지 않습니다.';
 const DARK_QUOTE = '이제 촛불 하나에 의지할 시간입니다.';
 const CANDLE_R = 120;
+const REVEAL_FRAMES = 60;
 const WIND_WARN = 90;
 const WIND_GUST = 150;
 const WIND_FORCE = 0.2;
@@ -67,7 +68,7 @@ const CAT_PUSH = 5;
 const CAT_TELL = '절 고양이가 놀러 왔습니다. 실을 아주 좋아합니다.';
 const ONE_WAY_TELL = '화살표가 있는 알은 그 방향으로만 꿰어집니다.';
 const DECOY_TELL = '붉은 알은 번뇌 알입니다. 꿰면 꿴 알이 빠집니다.';
-const DECOY_COST = 3;
+const DECOY_COST = 5;
 const DECOY_QUOTES = [
   '번뇌를 꿰었습니다. 번뇌가 번뇌를 밀어냈습니다.',
   '붉은 건 피하라고 했잖아요. 마음속으로.',
@@ -669,26 +670,31 @@ function spawnBead(k) {
   }
 }
 
-function makeBead(k, avoid) {
+function pickSpot(k, lift, avoid) {
   const reach = S.len * (0.8 - 0.3 * ease());
+  const maxY = Math.max(150, Math.min(H - 110, safeEyeY() - (3 + 22 * k) - lift - 6));
+  let x = W / 2;
+  let y = H / 2;
+  for (let i = 0; i < 60; i++) {
+    x = 40 + Math.random() * (W - 80);
+    y = 150 + Math.random() * (maxY - 150);
+    if (Math.hypot(x - ANCHOR.x, y - ANCHOR.y) < reach && avoid.every((p) => Math.hypot(x - p.x, y - p.y) > 90)) break;
+  }
+  const r = Math.hypot(x - ANCHOR.x, y - ANCHOR.y);
+  if (r > reach) {
+    x = ANCHOR.x + (x - ANCHOR.x) * reach / r;
+    y = ANCHOR.y + (y - ANCHOR.y) * reach / r;
+  }
+  return { x, y };
+}
+
+function makeBead(k, avoid) {
   const spin = S.strung.length < 10 ? 0 : (0.004 + 0.024 * k) * (Math.random() < 0.5 ? -1 : 1);
   const theta = Math.random() * Math.PI;
   const lift = spin ? 0 : (NEEDLE_LEN + 24) * Math.abs(Math.sin(theta));
-  const maxY = Math.max(150, Math.min(H - 110, safeEyeY() - (3 + 22 * k) - lift - 6));
-  let hx = W / 2;
-  let hy = H / 2;
-  for (let i = 0; i < 60; i++) {
-    hx = 40 + Math.random() * (W - 80);
-    hy = 150 + Math.random() * (maxY - 150);
-    if (Math.hypot(hx - ANCHOR.x, hy - ANCHOR.y) < reach && avoid.every((p) => Math.hypot(hx - p.x, hy - p.y) > 90)) break;
-  }
-  const r = Math.hypot(hx - ANCHOR.x, hy - ANCHOR.y);
-  if (r > reach) {
-    hx = ANCHOR.x + (hx - ANCHOR.x) * reach / r;
-    hy = ANCHOR.y + (hy - ANCHOR.y) * reach / r;
-  }
+  const { x: hx, y: hy } = pickSpot(k, lift, avoid);
   return {
-    hx, hy, x: hx, y: hy, px: hx, py: hy,
+    hx, hy, wx: hx, wy: hy, x: hx, y: hy, px: hx, py: hy,
     theta, spin, oneWay: 0, decoy: false,
     ph1: Math.random() * 6.28, ph2: Math.random() * 6.28,
     kx: 0, ky: 0, kvx: 0, kvy: 0, life: 0,
@@ -705,10 +711,26 @@ function updateBead(b, k) {
   b.kvy = (b.kvy - b.ky * 0.04) * 0.9;
   b.kx += b.kvx;
   b.ky += b.kvy;
+  if (b === S.bead && b.spin && !S.decoy) roamBead(b, k);
   b.x = b.hx + Math.sin(S.frame * 0.017 + b.ph2) * 34 * k + b.kx;
   b.y = b.hy + Math.sin(S.frame * 0.031 + b.ph1) * (3 + 22 * k) + b.ky;
   const near = Math.hypot(S.tip.x - b.x, S.tip.y - b.y) < HOLD_DIST;
   if (b === S.bead && S.phase === 'play' && timeLeft(b) <= 0 && !near) teleportBead(b, k);
+}
+
+function roamBead(b, k) {
+  const speed = MODES[S.mode].roam;
+  const dx = b.wx - b.hx;
+  const dy = b.wy - b.hy;
+  const d = Math.hypot(dx, dy);
+  if (d > speed) {
+    b.hx += (dx / d) * speed;
+    b.hy += (dy / d) * speed;
+  } else if (speed) {
+    const spot = pickSpot(k, 0, []);
+    b.wx = spot.x;
+    b.wy = spot.y;
+  }
 }
 
 function timeLeft(b) {
@@ -791,7 +813,7 @@ function threadBead() {
     const text = milestoneText(n);
     if (text) {
       track('milestone', { beads: n });
-      sayQuote(text, 5200);
+      sayQuote(text, 2000 + text.length * 60);
       sfx.moktak(CHAPTERS.some((c) => c.at === n) ? 3 : 1);
     }
   }
@@ -1006,7 +1028,7 @@ function drawShade() {
   g.setTransform(r * scale, 0, 0, r * scale, r * ox, r * oy);
   g.globalCompositeOperation = 'destination-out';
   light(g, S.tip.x, S.tip.y, CANDLE_R * (1 + 0.05 * Math.sin(S.frame * 0.3) + 0.03 * Math.sin(S.frame * 0.77)));
-  for (const b of [S.bead, S.decoy]) if (b) light(g, b.x, b.y, 30 + 70 * Math.max(0, 1 - b.life / 90));
+  for (const b of [S.bead, S.decoy]) if (b && b.life < REVEAL_FRAMES) light(g, b.x, b.y, 100 * (1 - b.life / REVEAL_FRAMES));
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.drawImage(shade, 0, 0, canvas.width, canvas.height);
   ctx.setTransform(dpr * scale, 0, 0, dpr * scale, dpr * ox, dpr * oy);
