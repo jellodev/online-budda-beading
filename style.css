@@ -56,6 +56,40 @@ html, body {
 }
 .count b { font-size: 53px; font-weight: normal; }
 .count span { font-size: 22px; color: var(--ink-dim); margin-left: 2px; }
+.badge {
+  display: inline-block;
+  margin-right: 8px;
+  vertical-align: 4px;
+  padding: 3px 10px;
+  border: 1px solid var(--gold);
+  border-radius: 999px;
+  font-family: var(--sans);
+  font-size: 13px;
+  font-style: normal;
+  font-weight: 700;
+  color: var(--gold);
+  background: rgba(0, 0, 0, 0.28);
+}
+.badge[data-mode="normal"] { color: #f0a35c; border-color: #f0a35c; }
+.badge[data-mode="hard"] { color: #ff6f5e; border-color: #ff6f5e; }
+
+.site-foot {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 14px 16px max(6px, env(safe-area-inset-bottom));
+  background: linear-gradient(transparent, rgba(8, 6, 12, 0.85) 45%);
+  text-align: center;
+  font-size: 10px;
+  line-height: 1.5;
+  color: rgba(244, 234, 216, 0.4);
+  pointer-events: none;
+}
+.site-foot a {
+  color: inherit;
+  pointer-events: auto;
+}
 
 .meta {
   text-align: right;
@@ -84,7 +118,7 @@ html, body {
   transition: opacity 0.6s ease;
 }
 .quote {
-  bottom: calc(max(16px, env(safe-area-inset-bottom)) + 16px);
+  bottom: calc(max(16px, env(safe-area-inset-bottom)) + 34px);
   font-family: var(--serif);
   font-size: 20px;
   line-height: 1.55;
@@ -139,7 +173,7 @@ button.primary:hover { background: #f2c873; }
   inset: 0;
   display: grid;
   place-items: center;
-  padding: 16px;
+  padding: 16px 16px 44px;
   background: rgba(8, 6, 12, 0.55);
   backdrop-filter: blur(3px);
   -webkit-backdrop-filter: blur(3px);
@@ -211,6 +245,11 @@ h2 { font-size: 31px; }
 }
 .actions [hidden] { display: none; }
 
+.mode-hint {
+  margin: 8px 0 0;
+  font-size: 13px;
+  color: var(--ink-dim);
+}
 .mode-title {
   margin: 14px 0 8px;
   font-size: 14px;

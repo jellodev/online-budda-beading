@@ -12,7 +12,6 @@ const LEN_PER_BEAD = 6;
 const EASY_UNTIL = 10;
 const SAFE_DEPTH = 0.6;
 const SAFE_DEPTH_LATE = 0.72;
-const TIMED_FROM = 90;
 const TIMED_FRAMES = 8 * 60;
 const WARN_FRAMES = 2 * 60;
 const FADE_FRAMES = 20;
@@ -27,11 +26,12 @@ const STEP = 1 / 60;
 const SAVE_KEY = 'yeomju108.save';
 const BEST_KEY = 'yeomju108.best';
 const MUTE_KEY = 'yeomju108.muted';
+const TOLD_KEY = 'yeomju108.told';
 
 const MODES = {
-  easy: { label: '쉬움', base: 0 },
-  normal: { label: '보통', base: 0.35 },
-  hard: { label: '어려움', base: 0.6 },
+  easy: { label: '쉬움', base: 0, weight: 1, grip: 1, timedFrom: 90, darkFrom: Infinity, oneWay: 0, decoy: 0, cat: false },
+  normal: { label: '보통', base: 0.35, weight: 1, grip: 1, timedFrom: 90, darkFrom: Infinity, oneWay: 0, decoy: 0, cat: true },
+  hard: { label: '어려움', base: 0.6, weight: 1.35, grip: 0.75, timedFrom: 54, darkFrom: 81, oneWay: 0.35, decoy: 0.25, cat: true },
 };
 const MODE_KEYS = Object.keys(MODES);
 
@@ -50,8 +50,44 @@ const MILESTONES = {
   54: '반. 여기서 그만두는 것도 깨달음일 수 있습니다.',
   70: '일흔 알. 남보다 빨리 꿰려는 마음이 바늘을 가장 많이 흔듭니다.',
   81: '사분의 삼. 실이 무거워졌다면, 그건 기분 탓이 아닙니다.',
-  90: '아흔 알. 이제 알도 오래 기다려 주지 않습니다.',
+  90: '아흔 알. 열여덟 번뇌 남았습니다.',
   100: '여덟 알. 지금 떨구면 정말 웃길 것 같습니다.',
+};
+
+const TIMED_QUOTE = '이제 알도 오래 기다려 주지 않습니다.';
+const DARK_QUOTE = '이제 촛불 하나에 의지할 시간입니다.';
+const CANDLE_R = 120;
+const WIND_WARN = 90;
+const WIND_GUST = 150;
+const WIND_FORCE = 0.2;
+const WIND_TELL = '산바람이 붑니다. 나뭇잎이 날리면 바늘을 단단히 잡으세요.';
+const CAT_FRAMES = 100;
+const CAT_HIT = 45;
+const CAT_PUSH = 5;
+const CAT_TELL = '절 고양이가 놀러 왔습니다. 실을 아주 좋아합니다.';
+const ONE_WAY_TELL = '화살표가 있는 알은 그 방향으로만 꿰어집니다.';
+const DECOY_TELL = '붉은 알은 번뇌 알입니다. 꿰면 꿴 알이 빠집니다.';
+const DECOY_COST = 3;
+const DECOY_QUOTES = [
+  '번뇌를 꿰었습니다. 번뇌가 번뇌를 밀어냈습니다.',
+  '붉은 건 피하라고 했잖아요. 마음속으로.',
+  '욕심도 알처럼 생겼습니다.',
+];
+const BEAD_COLORS = ['#c98a52', '#7a4523', '#2c160a'];
+const DECOY_COLORS = ['#e0604a', '#8a1c16', '#2a0606'];
+const IDLE_FRAMES = 60 * 60;
+const IDLE_QUOTE = '명상 중이신가요? 번뇌도 얌전히 기다리고 있습니다.';
+const DROPS_EGG = '떨군 알도 108개. 바닥에 염주가 하나 더 생겼습니다.';
+const KNOCK_R = 12;
+const KNOCKS = [
+  '그건 그냥 고리입니다. 깨달음은 거기 없습니다.',
+  '두드린다고 열리지 않습니다. 문이 아니라서.',
+  '고리도 번뇌가 있습니다. 방금 하나 늘었고요.',
+];
+const FLAWLESS = {
+  easy: '한 알도 안 떨구다니. 다음엔 보통으로 오세요. 부처님도 그러셨을 겁니다.',
+  normal: '한 알도 안 떨구다니. 혹시 전생에 염주 장인이셨나요?',
+  hard: '어려움에서 한 알도 안 떨구다니. 이건 수행이 아니라 기적입니다.',
 };
 
 const LAMENT_SMALL = [
@@ -86,11 +122,13 @@ const CHANT_FROM = 20;
 const $ = (id) => document.getElementById(id);
 const canvas = $('game');
 const ctx = canvas.getContext('2d');
+const shade = document.createElement('canvas');
 const view = { scale: 1, ox: 0, oy: 0, dpr: 1, cw: 0, ch: 0 };
 const input = { lastX: 0, lastY: 0, down: false };
 
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 const pick = (list) => list[Math.floor(Math.random() * list.length)];
+const rand = (lo, hi) => lo + Math.random() * (hi - lo);
 
 function load(key) {
   try { return JSON.parse(localStorage.getItem(key)); } catch { return null; }
@@ -188,6 +226,8 @@ const sfx = {
   hit() { tone(190, 0.1, 'sine', 0.3, 90); },
   drop() { tone(2100 + Math.random() * 900, 0.18, 'sine', 0.05, 1500); },
   vanish() { tone(700, 0.18, 'sine', 0.12, 2600); },
+  meow() { tone(700, 0.12, 'sine', 0.1, 950); tone(950, 0.35, 'sine', 0.09, 520, 0.1); },
+  wind() { tone(220, 2.4, 'sine', 0.05, 90); },
   moktak(times = 1) {
     for (let i = 0; i < times; i++) {
       tone(520, 0.32, 'sine', 0.45, 360, i * 0.42);
@@ -212,11 +252,11 @@ const beadSprite = (() => {
   return c;
 })();
 
-function paintBead(g, x, y, r) {
+function paintBead(g, x, y, r, colors = BEAD_COLORS) {
   const grad = g.createRadialGradient(x - r * 0.35, y - r * 0.4, r * 0.1, x, y, r);
-  grad.addColorStop(0, '#c98a52');
-  grad.addColorStop(0.45, '#7a4523');
-  grad.addColorStop(1, '#2c160a');
+  grad.addColorStop(0, colors[0]);
+  grad.addColorStop(0.45, colors[1]);
+  grad.addColorStop(1, colors[2]);
   g.fillStyle = grad;
   g.beginPath();
   g.arc(x, y, r, 0, Math.PI * 2);
@@ -241,7 +281,9 @@ function freshState(phase, mode, n0, elapsed, drops, peak) {
     phase, mode, strung: [], elapsed, drops, peak: top,
     falling: [], floats: [],
     frame: 0, tip, tipPrev: { ...tip }, tipVel: { x: 0, y: 0 }, eye, target: { ...tip },
-    len, rope, poly: null, bead: null, spawnIn: 40,
+    len, rope, poly: null, bead: null, decoy: null, spawnIn: 40,
+    idle: 0, knocks: 0, tells: [],
+    dark: 0, wind: 0, gust: null, windIn: rand(900, 1500), leaves: [], cat: null, catIn: rand(2400, 4200),
     lossCount: 0, lossTimer: 0, lossFloat: null, flash: 0, finishT: 0, ringFrom: null, resultShown: false,
   };
 }
@@ -262,6 +304,8 @@ function resize() {
   view.ch = window.innerHeight;
   canvas.width = Math.round(view.cw * view.dpr);
   canvas.height = Math.round(view.ch * view.dpr);
+  shade.width = Math.ceil(canvas.width / 2);
+  shade.height = Math.ceil(canvas.height / 2);
   view.scale = Math.min(view.cw / W, view.ch / H);
   view.ox = (view.cw - W * view.scale) / 2;
   view.oy = (view.ch - H * view.scale) / 2;
@@ -282,14 +326,16 @@ canvas.addEventListener('pointerdown', (e) => {
   input.lastX = e.clientX;
   input.lastY = e.clientY;
   if (canvas.setPointerCapture) canvas.setPointerCapture(e.pointerId);
-  if (e.pointerType !== 'touch' && S.phase === 'play') {
-    const p = toWorld(e);
-    setTarget(p.x, p.y);
-  }
+  if (S.phase !== 'play') return;
+  S.idle = 0;
+  const p = toWorld(e);
+  if (Math.hypot(p.x - ANCHOR.x, p.y - ANCHOR.y) < KNOCK_R) knock();
+  if (e.pointerType !== 'touch') setTarget(p.x, p.y);
 });
 
 window.addEventListener('pointermove', (e) => {
   if (S.phase !== 'play' || e.target.closest('button, a')) return;
+  S.idle = 0;
   if (e.pointerType === 'touch') {
     if (!input.down) return;
     const gain = 1.25 / view.scale;
@@ -309,13 +355,14 @@ for (const type of ['pointerup', 'pointercancel']) {
 function update() {
   S.frame++;
   const k = difficulty();
+  updateEvents();
   updateNeedle(k);
   updateRope();
   buildPoly();
   if (S.phase === 'done') {
     updateFinish();
   } else {
-    updateBead(k);
+    for (const b of [S.bead, S.decoy]) if (b) updateBead(b, k);
     checkThread(k);
     updateStrung();
   }
@@ -326,10 +373,97 @@ function update() {
     S.lossCount = 0;
   }
   if (S.phase !== 'play') return;
+  if (++S.idle === IDLE_FRAMES) sayQuote(IDLE_QUOTE, 4200);
   if (!S.bead && S.strung.length < TOTAL && --S.spawnIn <= 0) spawnBead(k);
   const last = S.strung[S.strung.length - 1];
   if (S.strung.length === TOTAL && last.s < S.poly.eyeS - BEAD_R) finish();
   if (S.frame % 120 === 0) save();
+}
+
+function updateEvents() {
+  const m = MODES[S.mode];
+  const live = S.phase === 'play';
+  S.dark += ((live && S.strung.length >= m.darkFrom ? 1 : 0) - S.dark) * 0.02;
+  S.wind = 0;
+  updateLeaves();
+  if (S.tells.length && !$('quote').classList.contains('on')) showTell();
+  if (!live || S.strung.length < EASY_UNTIL) {
+    S.gust = null;
+    S.cat = null;
+    return;
+  }
+  updateGust();
+  if (m.cat) updateCat();
+}
+
+function tell(key, text) {
+  if ((load(TOLD_KEY) || {})[key] || S.tells.some((t) => t.key === key)) return;
+  S.tells.push({ key, text });
+}
+
+function showTell() {
+  const { key, text } = S.tells.shift();
+  store(TOLD_KEY, { ...load(TOLD_KEY), [key]: true });
+  sayQuote(text, 4200);
+}
+
+function updateGust() {
+  if (!S.gust) {
+    if (--S.windIn > 0) return;
+    S.gust = { t: 0, dir: Math.random() < 0.5 ? -1 : 1 };
+    tell('wind', WIND_TELL);
+    sfx.wind();
+  }
+  const g = S.gust;
+  g.t++;
+  if (g.t % 4 === 0) {
+    S.leaves.push({ x: g.dir > 0 ? -10 : W + 10, y: rand(80, H - 120), vx: g.dir * rand(2.5, 5), vy: rand(-0.6, 0.6), rot: rand(0, 6.28), spin: rand(-0.15, 0.15) });
+  }
+  if (g.t > WIND_WARN) S.wind = g.dir * WIND_FORCE * Math.sin(Math.PI * (g.t - WIND_WARN) / WIND_GUST);
+  if (g.t >= WIND_WARN + WIND_GUST) {
+    S.gust = null;
+    S.windIn = rand(900, 1500);
+  }
+}
+
+function updateLeaves() {
+  for (const l of S.leaves) {
+    l.x += l.vx + S.wind * 20;
+    l.y += l.vy + Math.sin(S.frame * 0.1 + l.rot) * 0.6;
+    l.rot += l.spin;
+  }
+  S.leaves = S.leaves.filter((l) => l.x > -20 && l.x < W + 20);
+}
+
+function updateCat() {
+  if (!S.cat) {
+    if (--S.catIn > 0) return;
+    S.cat = { t: 0, dir: Math.random() < 0.5 ? 1 : -1, i: Math.floor(rand(10, SEGMENTS - 4)) };
+    tell('cat', CAT_TELL);
+  }
+  const c = S.cat;
+  if (++c.t === CAT_HIT) swat(c);
+  if (c.t >= CAT_FRAMES) {
+    S.cat = null;
+    S.catIn = rand(2400, 4200);
+  }
+}
+
+function swat(c) {
+  for (let j = Math.max(1, c.i - 4); j <= Math.min(SEGMENTS - 1, c.i + 4); j++) {
+    S.rope[j].px -= c.dir * (CAT_PUSH - Math.abs(j - c.i));
+  }
+  const p = S.rope[c.i];
+  S.floats.push({ x: p.x, y: p.y - 24, text: '냥', life: 50, color: '#f0c48a', size: 22 });
+  sfx.meow();
+}
+
+function catPaw(c) {
+  const p = S.rope[c.i];
+  const edge = c.dir > 0 ? -40 : W + 40;
+  const reach = c.t <= CAT_HIT ? c.t / CAT_HIT : 1 - (c.t - CAT_HIT) / (CAT_FRAMES - CAT_HIT);
+  const e = reach * reach * (3 - 2 * reach);
+  return { x: edge + (p.x - c.dir * 12 - edge) * e, y: p.y + 4 };
 }
 
 function updateNeedle(k) {
@@ -340,7 +474,7 @@ function updateNeedle(k) {
   const tdy = S.target.y - ANCHOR.y;
   const tr = Math.hypot(tdx, tdy);
   if (tr > maxR + NEEDLE_LEN) setTarget(ANCHOR.x + tdx * (maxR + NEEDLE_LEN) / tr, ANCHOR.y + tdy * (maxR + NEEDLE_LEN) / tr);
-  const tx = S.target.x + amp * (Math.sin(f * 0.21) + 0.6 * Math.sin(f * 0.57 + 1.3));
+  const tx = S.target.x + S.wind * 60 + amp * (Math.sin(f * 0.21) + 0.6 * Math.sin(f * 0.57 + 1.3));
   const ty = S.target.y + amp * (Math.cos(f * 0.17) + 0.6 * Math.sin(f * 0.49 + 0.4));
   S.tipPrev.x = S.tip.x;
   S.tipPrev.y = S.tip.y;
@@ -378,7 +512,7 @@ function updateRope() {
     const vy = (p.y - p.py) * 0.985;
     p.px = p.x;
     p.py = p.y;
-    p.x += vx;
+    p.x += vx + S.wind;
     p.y += vy + ROPE_G;
   }
   const end = rope[SEGMENTS];
@@ -440,11 +574,13 @@ function sampleAt(s) {
 
 function updateStrung() {
   const B = S.strung;
+  const { weight, grip } = MODES[S.mode];
+  const grav = BEAD_G * weight;
   const groups = [];
   B.forEach((b, i) => {
     const p = sampleAt(b.s);
-    const resting = Math.abs(b.v) < 0.03 && Math.abs(p.ty) < MU_S;
-    const u = resting ? 0 : (b.v + BEAD_G * p.ty - Math.sign(b.v || p.ty) * BEAD_G * MU_K * Math.abs(p.tx)) * BEAD_DAMP;
+    const resting = Math.abs(b.v) < 0.03 && Math.abs(p.ty) < MU_S * grip;
+    const u = resting ? 0 : (b.v + grav * p.ty - Math.sign(b.v || p.ty) * grav * MU_K * grip * Math.abs(p.tx)) * BEAD_DAMP;
     if (b.grow < 1) b.grow = Math.min(1, b.grow + 0.06);
     let g = { first: i, n: 1, sum: u };
     while (groups.length) {
@@ -484,15 +620,19 @@ function updateStrung() {
       last.v = Math.min(last.v, 0);
       break;
     }
-    const b = B.pop();
-    const p = sampleAt(S.poly.total);
-    S.falling.push({ x: p.x, y: p.y, vx: p.tx * b.v + S.tipVel.x * 0.5, vy: p.ty * b.v + S.tipVel.y * 0.5 });
-    S.drops++;
-    S.lossCount++;
-    S.lossTimer = 70;
-    sfx.drop();
-    showLoss();
+    dropLast();
   }
+}
+
+function dropLast() {
+  const b = S.strung.pop();
+  const p = sampleAt(S.poly.total);
+  S.falling.push({ x: p.x, y: p.y, vx: p.tx * b.v + S.tipVel.x * 0.5, vy: p.ty * b.v + S.tipVel.y * 0.5 });
+  S.drops++;
+  S.lossCount++;
+  S.lossTimer = 70;
+  sfx.drop();
+  showLoss();
 }
 
 function placeStack(n) {
@@ -515,6 +655,21 @@ function safeEyeY() {
 }
 
 function spawnBead(k) {
+  const m = MODES[S.mode];
+  const tricky = S.strung.length >= EASY_UNTIL;
+  S.bead = makeBead(k, [S.tip]);
+  if (tricky && Math.random() < m.oneWay) {
+    S.bead.oneWay = Math.random() < 0.5 ? -1 : 1;
+    tell('oneWay', ONE_WAY_TELL);
+  }
+  S.decoy = null;
+  if (tricky && Math.random() < m.decoy) {
+    S.decoy = { ...makeBead(k, [S.tip, S.bead]), decoy: true };
+    tell('decoy', DECOY_TELL);
+  }
+}
+
+function makeBead(k, avoid) {
   const reach = S.len * (0.8 - 0.3 * ease());
   const spin = S.strung.length < 10 ? 0 : (0.004 + 0.024 * k) * (Math.random() < 0.5 ? -1 : 1);
   const theta = Math.random() * Math.PI;
@@ -525,24 +680,22 @@ function spawnBead(k) {
   for (let i = 0; i < 60; i++) {
     hx = 40 + Math.random() * (W - 80);
     hy = 150 + Math.random() * (maxY - 150);
-    if (Math.hypot(hx - ANCHOR.x, hy - ANCHOR.y) < reach && Math.hypot(hx - S.tip.x, hy - S.tip.y) > 90) break;
+    if (Math.hypot(hx - ANCHOR.x, hy - ANCHOR.y) < reach && avoid.every((p) => Math.hypot(hx - p.x, hy - p.y) > 90)) break;
   }
   const r = Math.hypot(hx - ANCHOR.x, hy - ANCHOR.y);
   if (r > reach) {
     hx = ANCHOR.x + (hx - ANCHOR.x) * reach / r;
     hy = ANCHOR.y + (hy - ANCHOR.y) * reach / r;
   }
-  S.bead = {
+  return {
     hx, hy, x: hx, y: hy, px: hx, py: hy,
-    theta, spin,
+    theta, spin, oneWay: 0, decoy: false,
     ph1: Math.random() * 6.28, ph2: Math.random() * 6.28,
     kx: 0, ky: 0, kvx: 0, kvy: 0, life: 0,
   };
 }
 
-function updateBead(k) {
-  const b = S.bead;
-  if (!b) return;
+function updateBead(b, k) {
   b.life++;
   b.px = b.x;
   b.py = b.y;
@@ -555,11 +708,11 @@ function updateBead(k) {
   b.x = b.hx + Math.sin(S.frame * 0.017 + b.ph2) * 34 * k + b.kx;
   b.y = b.hy + Math.sin(S.frame * 0.031 + b.ph1) * (3 + 22 * k) + b.ky;
   const near = Math.hypot(S.tip.x - b.x, S.tip.y - b.y) < HOLD_DIST;
-  if (S.phase === 'play' && timeLeft(b) <= 0 && !near) teleportBead(b, k);
+  if (b === S.bead && S.phase === 'play' && timeLeft(b) <= 0 && !near) teleportBead(b, k);
 }
 
 function timeLeft(b) {
-  if (S.strung.length < TIMED_FROM) return Infinity;
+  if (S.strung.length < MODES[S.mode].timedFrom) return Infinity;
   return TIMED_FRAMES - (b.life - FADE_FRAMES);
 }
 
@@ -575,12 +728,26 @@ function needleDir() {
 
 function isAligned(b, k) {
   const d = needleDir();
-  return Math.abs(d.x * Math.cos(b.theta) + d.y * Math.sin(b.theta)) >= alignCos(k);
+  const dot = d.x * Math.cos(b.theta) + d.y * Math.sin(b.theta);
+  return (b.oneWay ? dot * b.oneWay : Math.abs(dot)) >= alignCos(k);
 }
 
 function checkThread(k) {
-  const b = S.bead;
-  if (!b || b.life < FADE_FRAMES || S.phase !== 'play') return;
+  if (S.phase !== 'play') return;
+  for (const b of [S.decoy, S.bead]) {
+    const hit = b && b.life >= FADE_FRAMES && crossing(b);
+    if (!hit) continue;
+    if (hit.perp <= holeTol(k) && isAligned(b, k) && (!b.oneWay || hit.dir === b.oneWay)) {
+      if (b.decoy) threadDecoy();
+      else threadBead();
+    } else {
+      hitBead(b);
+    }
+    return;
+  }
+}
+
+function crossing(b) {
   const ax = Math.cos(b.theta);
   const ay = Math.sin(b.theta);
   const r0x = S.tipPrev.x - b.px;
@@ -589,32 +756,50 @@ function checkThread(k) {
   const r1y = S.tip.y - b.y;
   const a0 = r0x * ax + r0y * ay;
   const a1 = r1x * ax + r1y * ay;
-  if (a0 === 0 || Math.sign(a0) === Math.sign(a1)) return;
+  if (a0 === 0 || Math.sign(a0) === Math.sign(a1)) return null;
   const t = a0 / (a0 - a1);
   const cx = r0x + (r1x - r0x) * t;
   const cy = r0y + (r1y - r0y) * t;
   const perp = Math.abs(-cx * ay + cy * ax);
-  if (perp > TARGET_R) return;
-  if (perp <= holeTol(k) && isAligned(b, k)) threadBead();
-  else hitBead(b);
+  if (perp > TARGET_R) return null;
+  return { perp, dir: Math.sign(a1 - a0) };
+}
+
+function threadDecoy() {
+  const { x, y } = S.decoy;
+  const before = S.drops;
+  S.decoy = null;
+  for (let i = 0; i < DECOY_COST && S.strung.length; i++) dropLast();
+  S.lossTimer = 0;
+  S.lossCount = 0;
+  S.floats.push({ x, y: y - 22, text: '번뇌', life: 60, color: '#ff4d3d', size: 24 });
+  if (before < TOTAL && S.drops >= TOTAL) dropsEgg();
+  else sayQuote(pick(DECOY_QUOTES), 3600);
 }
 
 function threadBead() {
   S.strung.push({ s: S.poly.total - NEEDLE_LEN * 0.35, v: -0.6, grow: 0 });
   S.floats.push({ x: S.bead.x, y: S.bead.y - 22, text: `${S.strung.length}`, life: 60, color: '#e8b85c', size: 24 });
   S.bead = null;
+  S.decoy = null;
   S.spawnIn = 45;
   sfx.thread();
   vibrate(12);
   const n = S.strung.length;
   if (n > S.peak) {
     S.peak = n;
-    if (MILESTONES[n]) {
+    const text = milestoneText(n);
+    if (text) {
       track('milestone', { beads: n });
-      sayQuote(MILESTONES[n], 4200);
+      sayQuote(text, 5200);
       sfx.moktak(CHAPTERS.some((c) => c.at === n) ? 3 : 1);
     }
   }
+}
+
+function milestoneText(n) {
+  const m = MODES[S.mode];
+  return [MILESTONES[n], n === m.timedFrom && TIMED_QUOTE, n === m.darkFrom && DARK_QUOTE].filter(Boolean).join(' ');
 }
 
 function hitBead(b) {
@@ -667,9 +852,20 @@ function showLoss() {
 
 function lament(k) {
   if (S.phase !== 'play' || k <= 0) return;
-  if (k >= 15) sayQuote(pick(LAMENT_BIG), 4200);
+  if (S.drops >= TOTAL && S.drops - k < TOTAL) dropsEgg();
+  else if (k >= 15) sayQuote(pick(LAMENT_BIG), 4200);
   else if (k >= 4) sayQuote(pick(LAMENT_MID), 3600);
   else if (Math.random() < 0.6) sayQuote(pick(LAMENT_SMALL), 3000);
+}
+
+function dropsEgg() {
+  sayQuote(DROPS_EGG, 5000);
+  sfx.moktak(3);
+}
+
+function knock() {
+  sfx.hit();
+  if (++S.knocks % 3 === 0) sayQuote(KNOCKS[(S.knocks / 3 - 1) % KNOCKS.length], 3200);
 }
 
 function ringPoint(i, t) {
@@ -680,6 +876,7 @@ function ringPoint(i, t) {
 function finish() {
   S.phase = 'done';
   S.bead = null;
+  S.decoy = null;
   S.finishT = 0;
   S.ringFrom = S.strung.map((b) => sampleAt(b.s));
   forget(SAVE_KEY);
@@ -730,9 +927,12 @@ function render() {
     drawRope();
     drawStrung();
     drawNeedle();
-    drawTarget();
+    for (const b of [S.decoy, S.bead]) if (b) drawTarget(b);
   }
   for (const p of S.falling) ctx.drawImage(beadSprite, p.x - BEAD_R, p.y - BEAD_R, BEAD_R * 2, BEAD_R * 2);
+  if (S.dark > 0.01) drawShade();
+  drawLeaves();
+  if (S.cat) drawCat();
   drawFloats();
   if (S.flash > 0) {
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
@@ -794,12 +994,76 @@ function drawNeedle() {
   ctx.restore();
 }
 
-function drawTarget() {
-  const b = S.bead;
-  if (!b) return;
+function drawShade() {
+  const { dpr, scale, ox, oy } = view;
+  const r = dpr * shade.width / canvas.width;
+  const g = shade.getContext('2d');
+  g.globalCompositeOperation = 'source-over';
+  g.setTransform(1, 0, 0, 1, 0, 0);
+  g.clearRect(0, 0, shade.width, shade.height);
+  g.fillStyle = `rgba(3, 3, 6, ${0.95 * S.dark})`;
+  g.fillRect(0, 0, shade.width, shade.height);
+  g.setTransform(r * scale, 0, 0, r * scale, r * ox, r * oy);
+  g.globalCompositeOperation = 'destination-out';
+  light(g, S.tip.x, S.tip.y, CANDLE_R * (1 + 0.05 * Math.sin(S.frame * 0.3) + 0.03 * Math.sin(S.frame * 0.77)));
+  for (const b of [S.bead, S.decoy]) if (b) light(g, b.x, b.y, 30 + 70 * Math.max(0, 1 - b.life / 90));
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.drawImage(shade, 0, 0, canvas.width, canvas.height);
+  ctx.setTransform(dpr * scale, 0, 0, dpr * scale, dpr * ox, dpr * oy);
+}
+
+function light(g, x, y, r) {
+  const grad = g.createRadialGradient(x, y, 0, x, y, r);
+  grad.addColorStop(0, 'rgba(0, 0, 0, 1)');
+  grad.addColorStop(0.6, 'rgba(0, 0, 0, 0.85)');
+  grad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+  g.fillStyle = grad;
+  g.beginPath();
+  g.arc(x, y, r, 0, Math.PI * 2);
+  g.fill();
+}
+
+function drawLeaves() {
+  ctx.fillStyle = 'rgba(201, 160, 74, 0.85)';
+  for (const l of S.leaves) {
+    ctx.save();
+    ctx.translate(l.x, l.y);
+    ctx.rotate(l.rot);
+    ctx.beginPath();
+    ctx.ellipse(0, 0, 6, 2.6, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+}
+
+function drawCat() {
+  const { x, y } = catPaw(S.cat);
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.scale(S.cat.dir, 1);
+  ctx.fillStyle = '#d98b3a';
+  ctx.fillRect(-460, -7, 460, 14);
+  ctx.beginPath();
+  ctx.arc(0, 0, 11, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = '#b06a28';
+  for (let i = 1; i <= 4; i++) ctx.fillRect(-14 - i * 16, -7, 6, 14);
+  ctx.fillStyle = '#f2b9a6';
+  for (const dy of [-7, 0, 7]) {
+    ctx.beginPath();
+    ctx.arc(9, dy, 3.2, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.beginPath();
+  ctx.arc(1, 0, 5, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+}
+
+function drawTarget(b) {
   const k = difficulty();
   const fade = Math.min(1, b.life / FADE_FRAMES);
-  const left = timeLeft(b);
+  const left = b.decoy ? Infinity : timeLeft(b);
   const near = Math.hypot(S.tip.x - b.x, S.tip.y - b.y) < 140;
   const aligned = near && isAligned(b, k);
   const hole = Math.max(2.2, holeTol(k) * 0.55);
@@ -824,13 +1088,13 @@ function drawTarget() {
   ctx.lineTo(80, 0);
   ctx.stroke();
   ctx.setLineDash([]);
-  if (aligned) {
-    ctx.fillStyle = 'rgba(255, 214, 120, 0.12)';
+  if (aligned || b.decoy) {
+    ctx.fillStyle = b.decoy ? `rgba(255, 60, 50, ${0.16 + 0.1 * Math.sin(S.frame * 0.15)})` : 'rgba(255, 214, 120, 0.12)';
     ctx.beginPath();
     ctx.arc(0, 0, TARGET_R + 7, 0, Math.PI * 2);
     ctx.fill();
   }
-  paintBead(ctx, 0, 0, TARGET_R);
+  paintBead(ctx, 0, 0, TARGET_R, b.decoy ? DECOY_COLORS : BEAD_COLORS);
   ctx.fillStyle = 'rgba(20, 8, 3, 0.35)';
   ctx.fillRect(-TARGET_R + 1, -hole * 0.5, TARGET_R * 2 - 2, hole);
   ctx.fillStyle = '#140803';
@@ -839,7 +1103,21 @@ function drawTarget() {
     ctx.ellipse(side * (TARGET_R - 1.5), 0, 1.8, hole, 0, 0, Math.PI * 2);
     ctx.fill();
   }
+  if (b.oneWay) drawArrow(b.oneWay);
   ctx.restore();
+}
+
+function drawArrow(dir) {
+  ctx.strokeStyle = '#ffd678';
+  ctx.lineWidth = 2;
+  ctx.lineJoin = ctx.lineCap = 'round';
+  for (const off of [TARGET_R + 6, TARGET_R + 13]) {
+    ctx.beginPath();
+    ctx.moveTo(dir * off, -5);
+    ctx.lineTo(dir * (off + 5), 0);
+    ctx.lineTo(dir * off, 5);
+    ctx.stroke();
+  }
 }
 
 function drawRing() {
@@ -1050,6 +1328,9 @@ async function saveCard() {
 
 function showResult() {
   const best = load(bestKey(S.mode));
+  const flawless = S.drops === 0;
+  $('r-eyebrow').textContent = flawless ? '무낙(無落) 성불' : '성불(?) 완료';
+  $('r-congrats').textContent = flawless ? FLAWLESS[S.mode] : '축하합니다. 그 많은 알을 떨구고도 끝내 다 꿴 당신, 이미 반쯤은 부처입니다.';
   $('r-mode').textContent = MODES[S.mode].label;
   $('r-time').textContent = formatTime(S.elapsed);
   $('r-drops').textContent = `${S.drops}개`;
@@ -1057,15 +1338,23 @@ function showResult() {
   $('result').hidden = false;
 }
 
+function syncModeBadge() {
+  const el = $('mode-badge');
+  el.dataset.mode = S.mode;
+  el.textContent = MODES[S.mode].label;
+}
+
 function begin(mode, saved) {
   S = saved ? freshState('play', mode, saved.n, saved.elapsed, saved.drops, saved.peak || saved.n) : freshState('play', mode, 0, 0, 0, 0);
   placeStack(saved ? saved.n : 0);
+  syncModeBadge();
   $('intro').hidden = true;
   $('result').hidden = true;
   audioCtx();
   roll('start', () => sfx.moktak(1));
   track('game_start', { mode: saved ? 'continue' : 'new', difficulty: mode, beads: S.strung.length });
-  sayQuote(saved ? '다시 오셨군요. 번뇌는 그대로 기다리고 있었습니다.' : '바늘 끝이 가는 곳으로, 마음도 갑니다.', 3600);
+  const hello = saved ? '다시 오셨군요. 번뇌는 그대로 기다리고 있었습니다.' : '바늘 끝이 가는 곳으로, 마음도 갑니다.';
+  sayQuote(mode === 'hard' ? `${hello} 오늘따라 실이 무겁습니다.` : hello, 3600);
 }
 
 const bgm = { nextBeat: 0 };
@@ -1115,23 +1404,40 @@ function initIntro() {
       : `친구가 [${mode}] ${challenge.n}알까지 꿰었습니다. 떨군 알 ${challenge.d}개. 당신은?`;
     el.hidden = false;
   }
-  const saved = load(SAVE_KEY);
   const btn = $('btn-continue');
-  if (saved && saved.n > 0) {
-    btn.hidden = false;
-    btn.textContent = `이어하기 (${saved.n}/108)`;
-  }
   btn.addEventListener('click', () => {
     const save = load(SAVE_KEY);
-    begin(save && MODE_KEYS.includes(save.mode) ? save.mode : 'easy', save);
+    begin(savedMode(save), save);
   });
-  for (const el of document.querySelectorAll('[data-mode]')) {
-    if (!btn.hidden) el.classList.remove('primary');
+  for (const el of document.querySelectorAll('button[data-mode]')) {
     el.addEventListener('click', () => {
       forget(SAVE_KEY);
       begin(el.dataset.mode, null);
     });
   }
+  showIntro();
+}
+
+function savedMode(save) {
+  return save && MODE_KEYS.includes(save.mode) ? save.mode : 'easy';
+}
+
+function showIntro() {
+  const saved = load(SAVE_KEY);
+  const resumable = Boolean(saved && saved.n > 0);
+  const btn = $('btn-continue');
+  btn.hidden = !resumable;
+  if (resumable) btn.textContent = `이어하기 (${MODES[savedMode(saved)].label} · ${saved.n}/108)`;
+  for (const el of document.querySelectorAll('button[data-mode]')) el.classList.toggle('primary', !resumable);
+  $('result').hidden = true;
+  $('intro').hidden = false;
+}
+
+function goMain() {
+  save();
+  S = freshState('intro', S.mode, 0, 0, 0, 0);
+  $('quote').classList.remove('on');
+  showIntro();
 }
 
 $('btn-sound').addEventListener('click', () => {
@@ -1145,6 +1451,8 @@ document.querySelector('.promo').addEventListener('click', () => track('promo_cl
 $('btn-share-result').addEventListener('click', share);
 $('btn-card').addEventListener('click', saveCard);
 $('btn-again').addEventListener('click', () => begin(S.mode, null));
+$('btn-main').addEventListener('click', goMain);
+$('btn-main-result').addEventListener('click', goMain);
 $('btn-restart').addEventListener('click', () => {
   if (S.phase === 'play' && S.strung.length > 0 && !confirm(`${S.strung.length}알을 전부 내려놓고 처음부터 할까요?`)) return;
   forget(SAVE_KEY);
